@@ -197,6 +197,29 @@ def upload_missing_file_is_refused():
     assert "not found" in sgaj("upload", idx(look, "Resume/CV", "file"), FIXTURES / "nope.pdf")
 
 
+@scenario()
+def radios_name_their_question():
+    look = sgaj("open", page("questions.html"))
+    expect = [
+        '"Yes" in "Are you legally authorized to work in India? *"',
+        '"No" in "Will you now or in the future require visa sponsorship? ✱"',
+        '"Hindi" in "Which languages do you speak fluently?"',
+        '"Yes" in "Are you open to relocation?"',
+    ]
+    for line in expect:
+        assert line in look, f"{line} missing:\n{look}"
+    assert re.search(r'checkbox "I agree to the privacy policy" \(off\)$', look, re.M), look
+
+
+@scenario()
+def answering_one_group_leaves_the_other_visible():
+    look = sgaj("open", page("questions.html"))
+    no = [m[1] for m in re.finditer(r'^\[(\d+)\] radio "No" in "Will you', look, re.M)][0]
+    sgaj("click", no)
+    assert dom("document.querySelector('[name=\"cards[q2]\"]:checked').value") == "No"
+    assert dom("document.querySelector('[name=auth]:checked')") is None
+
+
 # --- runner ---------------------------------------------------------------------------------------
 
 

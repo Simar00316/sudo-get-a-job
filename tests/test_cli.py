@@ -40,3 +40,9 @@ def test_clip_collapses_whitespace_and_truncates():
 def test_render_shows_attached_file_name():
     out = render(snap([{"node": 9, "role": "file", "kind": "upload", "label": "Resume *", "value": "cv.pdf"}]))
     assert out.splitlines()[-1] == '[9] file "Resume *" = "cv.pdf"'
+
+
+def test_render_names_the_question_an_option_answers():
+    out = render(snap([{"node": 4, "role": "radio", "kind": "click", "label": "No", "checked": "false",
+                        "question": "Will you require visa sponsorship?"}]))
+    assert out.splitlines()[-1] == '[4] radio "No" in "Will you require visa sponsorship?" (off)'
