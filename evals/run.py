@@ -328,7 +328,9 @@ def labels_exclude_status_and_error_text():
     assert 'textbox "Current location ✱" = ""' in look, look
     assert 'textbox "Email" = ""' in look, look
     assert 'link "ATTACH RESUME/CV"' in look, look
-    assert "No location found" not in look and "valid email" not in look and "Analyzing" not in look, look
+    elements = "\n".join(line for line in look.splitlines() if line.startswith("["))
+    assert "No location found" not in elements and "valid email" not in elements and "Analyzing" not in elements, look
+    assert "alerts: Please enter a valid email address" in look, look
 
 
 @scenario()
@@ -342,6 +344,52 @@ def select_updates_react_controlled_state():
     look = sgaj("open", page("react.html"))
     assert sgaj("select", idx(look, "Years of experience"), "1-2") == "ok: 1-2"
     assert dom("window.reactState") == "1-2"
+
+
+@scenario()
+def look_marks_empty_required_fields():
+    look = sgaj("open", page("apply.html"))
+    assert re.search(r'textbox "First name \*" = "" \(required\)$', look, re.M), look
+    n = idx(look, "First name")
+    sgaj("fill", n, "Simarpreet")
+    assert re.search(rf'^\[{n}\] textbox "First name \*" = "Simarpreet"$', sgaj("look"), re.M)
+
+
+@scenario()
+def check_lists_missing_required_answers():
+    look = sgaj("open", page("apply.html", "#s2"))
+    out = sgaj("check")
+    for missing in ["Years of professional experience", "Are you legally authorized", "Will you require visa",
+                    "Why do you want", "I agree to the privacy policy"]:
+        assert missing in out, f"{missing} not reported:\n{out}"
+    assert "LinkedIn" not in out and "GitHub" not in out, out  # optional fields
+    sgaj("select", idx(look, "Years of professional experience"), "1-2")
+    sgaj("click", re.search(r'^\[(\d+)\] radio "Yes" in "Are you legally', look, re.M)[1])
+    out = sgaj("check")
+    assert "Years of professional experience" not in out and "Are you legally authorized" not in out, out
+
+
+@scenario()
+def check_passes_when_complete():
+    look = sgaj("open", page("captcha.html"))
+    sgaj("fill", idx(look, "Email"), "s@example.com")
+    out = sgaj("check")
+    assert out.splitlines()[0] == "ok: all required fields filled", out
+
+
+@scenario()
+def validation_alerts_are_shown():
+    look = sgaj("open", page("apply.html"))
+    sgaj("click", idx(look, "Next"))
+    assert re.search(r"^alerts: Please complete: fn, ln", sgaj("look"), re.M)
+
+
+@scenario()
+def visible_captcha_is_reported_invisible_one_ignored():
+    look = sgaj("open", page("captcha.html"))
+    assert look.count("captcha: recaptcha") == 1, look
+    assert "frame (cross-origin" not in look, look
+    assert "captcha: recaptcha" in sgaj("check")
 
 
 # --- runner ---------------------------------------------------------------------------------------

@@ -46,3 +46,31 @@ def test_render_names_the_question_an_option_answers():
     out = render(snap([{"node": 4, "role": "radio", "kind": "click", "label": "No", "checked": "false",
                         "question": "Will you require visa sponsorship?"}]))
     assert out.splitlines()[-1] == '[4] radio "No" in "Will you require visa sponsorship?" (off)'
+
+
+def test_check_groups_radios_by_question_and_skips_optional():
+    from sudo_get_a_job.cli import check
+
+    s = snap([
+        {"node": 1, "role": "textbox", "kind": "fill", "label": "LinkedIn", "value": "", "empty": True},
+        {"node": 2, "role": "radio", "kind": "click", "label": "Yes", "question": "Sponsorship? *",
+         "required": True, "empty": True},
+        {"node": 3, "role": "radio", "kind": "click", "label": "No", "question": "Sponsorship? *",
+         "required": True, "empty": True},
+        {"node": 4, "role": "combobox", "kind": "select", "label": "Years → 1-2", "required": True, "empty": True},
+        {"node": 4, "role": "combobox", "kind": "select", "label": "Years → 2-4", "required": True, "empty": True},
+    ])
+    s.update(alerts=["Please answer all questions"], captchas=["hcaptcha"])
+    assert check(s).splitlines() == [
+        "missing required:",
+        '  [2] radio group "Sponsorship? *"',
+        '  [4] select "Years"',
+        "alerts: Please answer all questions",
+        "captcha: hcaptcha (ask the user to solve it in the browser)",
+    ]
+
+
+def test_check_all_clear():
+    from sudo_get_a_job.cli import check
+
+    assert check(snap([])) == "ok: all required fields filled"
