@@ -158,6 +158,45 @@ def offscreen_links_outside_forms_stay_hidden():
     assert "more below" in look
 
 
+RESUME = FIXTURES / "resume.pdf"
+
+
+@scenario()
+def look_shows_file_inputs():
+    look = sgaj("open", page("apply.html"))
+    assert re.search(r'^\[\d+\] file "Resume/CV \* \(PDF\)" = "\(none\)"$', look, re.M), look
+
+
+@scenario()
+def upload_attaches_resume():
+    look = sgaj("open", page("apply.html"))
+    assert sgaj("upload", idx(look, "Resume/CV", "file"), RESUME) == "ok: resume.pdf"
+    assert dom("cv.files[0].name") == "resume.pdf"
+    assert dom("document.getElementById('cv-name').textContent") == "resume.pdf"
+    assert '= "resume.pdf"' in sgaj("look")
+
+
+@scenario()
+def upload_through_hidden_input_or_its_button():
+    look = sgaj("open", page("upload.html"))
+    assert sgaj("upload", idx(look, "Upload file", "button"), RESUME) == "ok: resume.pdf"
+    assert dom("shown.textContent") == "resume.pdf"
+
+
+@scenario()
+def clicking_upload_button_explains_instead_of_opening_dialog():
+    look = sgaj("open", page("upload.html"))
+    out = sgaj("click", idx(look, "Upload file"))
+    assert "sgaj upload" in out, out
+    assert dom("cv.files.length") == 0
+
+
+@scenario()
+def upload_missing_file_is_refused():
+    look = sgaj("open", page("apply.html"))
+    assert "not found" in sgaj("upload", idx(look, "Resume/CV", "file"), FIXTURES / "nope.pdf")
+
+
 # --- runner ---------------------------------------------------------------------------------------
 
 

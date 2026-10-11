@@ -59,6 +59,27 @@ SELECT = """((node, want) => {
   return {selected: o.label};
 })"""
 
+# The file input that belongs to an observed node: the node itself, or the single one in its field.
+FILE_INPUT = """(node => {
+  const e = window.__jevFast?.nodes.get(node);
+  if (!e?.isConnected) return null;
+  if (e.type === 'file') return e;
+  for (let p = e.parentElement, i = 0; p && i < 5; p = p.parentElement, i++) {
+    const found = p.querySelectorAll('input[type=file]');
+    if (found.length) return found.length === 1 ? found[0] : null;
+  }
+  return null;
+})"""
+
+# Clicking these opens the OS file dialog, which no automation can drive.
+FILE_TRIGGER = """(node => {
+  const e = window.__jevFast?.nodes.get(node), f = (""" + FILE_INPUT + """)(node);
+  if (!f) return null;
+  const trigger = e === f || e.control === f ||
+    /upload|attach|browse|choose file|select file|drop/i.test(e.innerText || e.value || '');
+  return trigger ? (window.__jevFast.ids.get(f) ?? node) : null;
+})"""
+
 KEYS = {"Enter": 13, "Tab": 9, "Escape": 27, "Backspace": 8, "ArrowDown": 40, "ArrowUp": 38, "Space": 32}
 
 
@@ -68,6 +89,8 @@ class Tab:
         self.session = cdp("Target.attachToTarget", targetId=target, flatten=True)["sessionId"]
         # Keep timers/animations running even when the user is looking at another tab.
         self.call("Emulation.setFocusEmulationEnabled", enabled=True)
+        # Backstop: never let a click open the native file dialog.
+        self.call("Page.setInterceptFileChooserDialog", enabled=True)
 
     @classmethod
     def new(cls, url):
@@ -144,6 +167,8 @@ class Tab:
             self.call("Input.dispatchMouseEvent", type=event, x=x, y=y, button="left", clickCount=1)
 
     def click(self, node):
+        if str(node).isdigit() and (f := self.evaluate(f"{FILE_TRIGGER}({int(node)})")):
+            raise ActionError(f"[{node}] opens a file picker. Use: sgaj upload {f} PATH")
         t = self._resolve(node)
         self._mouse_click(t["x"], t["y"])
 
@@ -163,6 +188,21 @@ class Tab:
         if "error" in r:
             raise ActionError(r["error"])
         return r["selected"]
+
+    def upload(self, node, path):
+        path = Path(path).expanduser().resolve()
+        if not path.is_file():
+            raise ActionError(f"File not found: {path}")
+        if not str(node).isdigit():
+            raise ActionError(f"Element must be a number from look, got {node!r}.")
+        r = self.call("Runtime.evaluate", expression=f"{FILE_INPUT}({int(node)})")
+        object_id = r.get("result", {}).get("objectId")
+        if not object_id:
+            raise ActionError(f"Element [{node}] is not a file field or its upload button.")
+        self.call("DOM.setFileInputFiles", files=[str(path)], objectId=object_id)
+        names = self.call("Runtime.callFunctionOn", objectId=object_id, returnByValue=True,
+                          functionDeclaration="function() { return [...this.files].map(f => f.name).join(', '); }")
+        return names["result"]["value"]
 
     def press(self, key):
         if key not in KEYS:
