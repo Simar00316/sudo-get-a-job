@@ -91,13 +91,17 @@
   const roles = ['button', 'link', 'checkbox', 'radio', 'switch', 'tab', 'menuitem', 'menuitemradio',
     'option', 'gridcell', 'combobox', 'textbox', 'searchbox', 'spinbutton'];
   const formRoles = ['file', 'checkbox', 'radio', 'switch', 'combobox', 'textbox', 'searchbox', 'spinbutton'];
-  const selector = 'a[href],button,input,textarea,select,summary,[contenteditable="true"],' +
-    roles.map(role => '[role="' + role + '"]').join(',');
+  // JS-only clickables count too: <a> without href (Work at a Startup's Apply), onclick, tabindex >= 0.
+  const selector = 'a,button,input,textarea,select,summary,[contenteditable="true"],[onclick],' +
+    '[tabindex]:not([tabindex^="-"]),' + roles.map(role => '[role="' + role + '"]').join(',');
   const role = e => {
     const explicit = e.getAttribute('role');
     if (roles.includes(explicit)) return explicit;
     if (e.tagName === 'BUTTON' || e.tagName === 'SUMMARY') return 'button';
-    if (e.tagName === 'A') return 'link';
+    if (e.tagName === 'A') return e.hasAttribute('href') ? 'link' : (e.onclick || e.innerText.trim()) ? 'button' : null;
+    if (!['INPUT', 'SELECT', 'TEXTAREA'].includes(e.tagName) && !e.isContentEditable &&
+        (e.hasAttribute('onclick') || e.tabIndex >= 0) &&
+        !e.querySelector('a,button,input,select,textarea,[role],[tabindex],[onclick]')) return 'button';
     if (e.tagName === 'SELECT') return 'combobox';
     if (e.tagName === 'TEXTAREA' || e.isContentEditable) return 'textbox';
     if (e.tagName === 'INPUT') {
