@@ -23,7 +23,7 @@ captcha: recaptcha (ask the user to solve it in the browser)
 - `select`: `select N OPTION` with an option from the list.
 - `combobox` that is not a text field: `pick N TEXT`, which opens it and clicks the matching option.
 - `radio`: click the option whose `in "<question>"` matches. `checkbox`: click only to change its state.
-- `file`: `upload N ~/job-hunt/resume/<file>`. Never click upload buttons; `sgaj` refuses because they open a dialog it cannot control.
+- `file`: `upload N <workspace>/resume/<file>`. Never click upload buttons; `sgaj` refuses because they open a dialog it cannot control.
 - Off-screen fields are listed too. Acting on them scrolls automatically.
 - `frame (cross-origin …)`: the form is embedded from another site. `sgaj goto` that URL and fill it there.
 

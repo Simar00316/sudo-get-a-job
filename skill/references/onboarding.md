@@ -1,6 +1,6 @@
 # Onboarding
 
-Run this once, when `~/job-hunt/profile.md` does not exist. Keep it friendly and short: the user wants to start applying, not fill out a survey.
+Run this once, when the workspace (the folder `sgaj doctor` prints) has no `profile.md`. Keep it friendly and short: the user wants to start applying, not fill out a survey.
 
 ## 1. Ask the questions
 
@@ -19,13 +19,13 @@ Use your multiple-choice question tool if you have one (in Claude Code: AskUserQ
 
 Ask the user to paste their resume text or give a file path (PDF or DOCX).
 
-- Copy files into `~/job-hunt/resume/`. Keep the original file name.
+- Copy files into `<workspace>/resume/`. Keep the original file name.
 - Read it and fill the profile's facts from it: name, email, phone, links, education, experience, skills.
-- Offer to review it. Suggest concrete improvements (clarity, impact, keywords for their target roles), but never add anything that isn't true. If they want a revised version, write it to `~/job-hunt/resume/resume.md` and help them export it to PDF. Until then, applications use the original file.
+- Offer to review it. Suggest concrete improvements (clarity, impact, keywords for their target roles), but never add anything that isn't true. If they want a revised version, write it to `<workspace>/resume/resume.md` and help them export it to PDF. Until then, applications use the original file.
 
 ## 3. Write `profile.md`
 
-Create `~/job-hunt/profile.md` from `profile-template.md` next to this file. Show the user the result and ask them to correct anything wrong.
+Create `<workspace>/profile.md` from `profile-template.md` next to this file. Show the user the result and ask them to correct anything wrong.
 
 ## 4. Connect the browser
 

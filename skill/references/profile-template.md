@@ -6,7 +6,7 @@ Source of truth for every answer typed into an application. Edit freely.
 
 - auto_submit: no
 - daily_limit: 20
-- resume_file: ~/job-hunt/resume/RESUME.pdf
+- resume_file: <workspace>/resume/RESUME.pdf
 - cover_letter: write a short one per job only when the form asks for it
 
 ## Contact
