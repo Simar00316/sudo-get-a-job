@@ -454,7 +454,7 @@ def links_collects_job_urls_from_results():
     out = sgaj("links", "--match", "/jobs/view/")
     lines = out.splitlines()
     assert len(lines) == 3, out  # duplicates merged, company link filtered, off-screen link included
-    assert re.match(r"AI Engineer Acme AI · Remote — file:///.*/jobs/view/101/\?trk=search$", lines[0]), out
+    assert re.match(r"AI Engineer Acme AI · Remote — file://.*/jobs/view/101/\?trk=search$", lines[0]), out
     assert "Applied AI Engineer" in lines[2]
     assert "company/acme" in sgaj("links")
 
