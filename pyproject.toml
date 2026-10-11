@@ -1,21 +1,18 @@
 [project]
-name = "jev-ultrafast"
+name = "sudo-get-a-job"
 version = "0.1.0"
-description = "A browser agent that chooses instead of generating."
+description = "Apply to jobs from your coding agent. Browser control for Claude Code & Codex, no LLM API keys."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
-dependencies = ["browser-harness==0.1.13", "httpx[http2]>=0.28,<1"]
-
-[project.scripts]
-jev = "jev_ultrafast.demo:main"
+dependencies = ["browser-harness==0.1.13"]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = ["pytest>=8.4,<9", "ruff>=0.14,<1", "pillow>=11,<13"]
+dev = ["pytest>=8.4,<9", "ruff>=0.14,<1"]
 
 [tool.ruff]
 line-length = 120
