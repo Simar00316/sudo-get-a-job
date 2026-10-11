@@ -1,0 +1,30 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Screening questions</title></head><body>
+<form>
+  <fieldset><legend>Are you legally authorized to work in India? *</legend>
+    <label><input type="radio" name="auth" value="yes"> Yes</label>
+    <label><input type="radio" name="auth" value="no"> No</label></fieldset>
+
+  <!-- Lever: question is a sibling div, no fieldset -->
+  <ul>
+    <li class="application-question">
+      <div class="application-label">Will you now or in the future require visa sponsorship? ✱</div>
+      <ul><li><label><input type="radio" name="cards[q2]" value="Yes"> Yes</label></li>
+          <li><label><input type="radio" name="cards[q2]" value="No"> No</label></li></ul>
+    </li>
+    <li class="application-question">
+      <div class="application-label">Which languages do you speak fluently?</div>
+      <ul><li><label><input type="checkbox" name="cards[q3]" value="English"> English</label></li>
+          <li><label><input type="checkbox" name="cards[q3]" value="Hindi"> Hindi</label></li></ul>
+    </li>
+  </ul>
+
+  <!-- ARIA radiogroup with empty option labels (Ashby-like) -->
+  <div id="relo-q">Are you open to relocation?</div>
+  <div role="radiogroup" aria-labelledby="relo-q">
+    <input type="radio" name="relo" value="Yes"><input type="radio" name="relo" value="No">
+  </div>
+
+  <label><input type="checkbox" id="consent"> I agree to the privacy policy</label>
+</form>
+</body></html>

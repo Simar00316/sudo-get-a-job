@@ -30,6 +30,26 @@
     }
     return '';
   };
+  // The question a radio/checkbox answers: legend, ARIA group name, or the text heading its option group.
+  const question = e => {
+    const legend = e.closest('fieldset')?.querySelector('legend');
+    if (legend) return legend.innerText.trim();
+    const group = e.closest('[role="radiogroup"],[role="group"]');
+    const groupName = group && name(group, new Set([...group.querySelectorAll('*')]));
+    if (groupName) return groupName;
+    if (!e.name) return '';
+    const options = [...document.querySelectorAll('input')].filter(x => x.name === e.name && x.type === e.type);
+    let box = e.parentElement;
+    while (box && !options.every(x => box.contains(x))) box = box.parentElement;
+    // Grow until the box also holds the question text, but never across another option group.
+    const labels = new Set(options.map(x => name(x).trim()));
+    for (let i = 0; box && i < 4; box = box.parentElement, i++) {
+      if ([...box.querySelectorAll('input[type=radio],input[type=checkbox]')].some(x => x.name !== e.name)) break;
+      const line = box.innerText.split(/\n/).map(s => s.trim()).find(s => s && !labels.has(s));
+      if (line) return line;
+    }
+    return '';
+  };
   const roles = ['button', 'link', 'checkbox', 'radio', 'switch', 'tab', 'menuitem', 'menuitemradio',
     'option', 'gridcell', 'combobox', 'textbox', 'searchbox', 'spinbutton'];
   const formRoles = ['file', 'checkbox', 'radio', 'switch', 'combobox', 'textbox', 'searchbox', 'spinbutton'];
@@ -73,7 +93,12 @@
       const value = e.getAttribute('aria-' + key);
       if (value !== null) base[key] = value;
     }
-    if (['checkbox', 'radio'].includes(e.type)) base.checked = String(e.checked);
+    if (['checkbox', 'radio'].includes(e.type)) {
+      base.checked = String(e.checked);
+      if (base.label === rname && e.value && e.value !== 'on') base.label = e.value;
+      const q = question(e);
+      if (q && q !== base.label) base.question = q;
+    }
     if (e.tagName === 'SELECT') {
       for (const o of e.options) if (!o.selected && !o.disabled && !o.closest('optgroup[disabled]'))
         actions.push({...base, kind: 'select', value: o.value,

@@ -26,6 +26,8 @@ def render(snap):
         label = clip(a["label"].split(" → ")[0])
         role = "select" if "select" in kinds else a["role"]
         line = f"[{node}] {role} \"{label}\""
+        if a.get("question"):
+            line += f" in \"{clip(a['question'])}\""
         if "select" in kinds:
             options = [x["label"].split(" → ", 1)[1] for x in acts]
             line += f" = \"{clip(a.get('current_value', ''), 40)}\" options: {clip(' | '.join(options), 200)}"
