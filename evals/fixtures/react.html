@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>React-controlled select</title></head><body>
+<label for="yoe">Years of experience</label>
+<select id="yoe"><option value="">Select…</option><option>0-1</option><option>1-2</option><option>2-4</option></select>
+<p id="state"></p>
+<script>
+// Mirrors React's inputValueTracking: the instance setter records the value, and onChange
+// only fires when the DOM value differs from the last recorded one.
+const sel = document.getElementById('yoe');
+const proto = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+let tracked = proto.get.call(sel);
+Object.defineProperty(sel, 'value', {configurable: true, get() { return proto.get.call(this); },
+  set(v) { tracked = String(v); proto.set.call(this, v); }});
+window.reactState = '';
+sel.addEventListener('change', () => {
+  const v = proto.get.call(sel);
+  if (v === tracked) return;  // React: "value did not change", onChange swallowed
+  tracked = v; window.reactState = v; document.getElementById('state').textContent = v;
+});
+</script>
+</body></html>

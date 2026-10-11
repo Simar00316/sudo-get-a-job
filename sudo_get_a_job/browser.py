@@ -66,7 +66,9 @@ SELECT = """((node, want) => {
   const usable = [...e.options].filter(o => !o.disabled && !o.closest('optgroup[disabled]'));
   const o = usable.find(o => norm(o.label) === norm(want) || norm(o.value) === norm(want));
   if (!o) return {error: `No option "${want}". Options: ${usable.map(o => o.label).join(' | ')}`};
-  e.value = o.value;
+  // Prototype setter from the element's own realm: React's value tracker ignores direct assignment.
+  const win = e.ownerDocument.defaultView;
+  Object.getOwnPropertyDescriptor(win.HTMLSelectElement.prototype, 'value').set.call(e, o.value);
   e.dispatchEvent(new Event('input', {bubbles: true}));
   e.dispatchEvent(new Event('change', {bubbles: true}));
   return {selected: o.label};
