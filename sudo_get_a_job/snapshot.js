@@ -145,6 +145,11 @@
       base.empty = e.type === 'radio' ? !group.some(x => x.checked) : e.type === 'checkbox' ? !e.checked :
         e.tagName === 'SELECT' ? e.value === '' :
         !('value' in e && e.tagName !== 'BUTTON' ? e.value : e.innerText).trim();
+      // A custom dropdown still showing its placeholder has no answer yet.
+      const shown = base.role === 'combobox' && e.tagName !== 'SELECT' && !('value' in e && e.tagName !== 'BUTTON') &&
+        e.innerText.trim();
+      if (shown && (/^(select|choose|please select|pick)\b|^-+$/i.test(shown) ||
+          [e.getAttribute('placeholder'), e.dataset.placeholder].includes(shown))) base.empty = true;
       if (e.getAttribute('aria-invalid') === 'true') base.invalid = true;
     }
     if (e.tagName === 'SELECT') {

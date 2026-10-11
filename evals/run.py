@@ -360,7 +360,7 @@ def check_lists_missing_required_answers():
     look = sgaj("open", page("apply.html", "#s2"))
     out = sgaj("check")
     for missing in ["Years of professional experience", "Are you legally authorized", "Will you require visa",
-                    "Why do you want", "I agree to the privacy policy"]:
+                    "Notice period", "Why do you want", "I agree to the privacy policy"]:
         assert missing in out, f"{missing} not reported:\n{out}"
     assert "LinkedIn" not in out and "GitHub" not in out, out  # optional fields
     sgaj("select", idx(look, "Years of professional experience"), "1-2")
