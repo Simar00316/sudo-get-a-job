@@ -1,0 +1,15 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Noisy labels</title></head><body>
+<form>
+  <!-- Lever: the label wraps the question, the input and a status/result list -->
+  <label class="application-question">
+    <div class="application-label">Current location ✱</div>
+    <div class="application-field"><input type="text" id="loc">
+      <div class="dropdown-results">No location found. Try entering a different location</div></div>
+  </label>
+  <label for="em">Email <span role="alert">Please enter a valid email address</span></label>
+  <input id="em" type="email">
+  <a href="#cv" class="resume-upload">ATTACH RESUME/CV <span aria-live="polite">Analyzing resume…</span></a>
+  <a href="#job">Senior AI Engineer<br>Acme AI<br>Remote, India</a>
+</form>
+</body></html>
