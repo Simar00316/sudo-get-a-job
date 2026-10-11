@@ -1,7 +1,9 @@
 """sgaj: compact browser eyes and hands for coding agents. Run `sgaj --help`."""
 
 import argparse
+import json
 import sys
+import time
 
 from .browser import ActionError, Tab
 
@@ -78,6 +80,50 @@ def check(snap):
     return "\n".join(lines + footer(snap))
 
 
+# name -> (argument names, handler). Shared by single commands and `do` batches.
+ACTIONS = {
+    "click": (["n"], lambda t, n: t.click(n)),
+    "fill": (["n", "text"], lambda t, n, text: t.fill(n, text)),
+    "select": (["n", "option"], lambda t, n, option: t.select(n, option)),
+    "pick": (["n", "text"], lambda t, n, text: t.pick(n, text)),
+    "upload": (["n", "path"], lambda t, n, path: t.upload(n, path)),
+    "press": (["key"], lambda t, key: t.press(key)),
+    "wait": (["seconds"], lambda t, seconds: time.sleep(min(float(seconds), 10))),
+}
+
+
+def act(tab, name, args):
+    if name not in ACTIONS:
+        raise ActionError(f"unknown action {name!r}. Use: {', '.join(ACTIONS)}")
+    params, handler = ACTIONS[name]
+    if len(args) != len(params):
+        raise ActionError(f"{name} takes {' '.join(params).upper()}")
+    result = handler(tab, *[str(a) for a in args])
+    return f"ok: {result}" if isinstance(result, str) else "ok"
+
+
+def batch(tab, raw):
+    """Run [[action, *args], ...] in order; stop at the first error, then print a fresh look."""
+    try:
+        steps = json.loads(raw)
+        assert isinstance(steps, list) and all(isinstance(s, list) and s for s in steps)
+    except (ValueError, AssertionError):
+        print('error: do expects JSON like [["fill", 12, "Simar"], ["click", 15]]')
+        return 1
+    code = 0
+    for i, (name, *args) in enumerate(steps, 1):
+        label = " ".join([str(name), *(str(a) for a in args[:1])])
+        try:
+            print(f"{i} {label}: {act(tab, name, args)}")
+        except ActionError as e:
+            print(f"{i} {label}: error: {e}")
+            print(f"stopped; {len(steps) - i} action(s) not run")
+            code = 1
+            break
+    print(render(tab.snapshot()))
+    return code
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="sgaj", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -99,6 +145,9 @@ def main(argv=None):
     u = sub.add_parser("upload", help="attach a file to file field N (or its upload button)")
     u.add_argument("n")
     u.add_argument("path")
+    d = sub.add_parser("do", help="""run several actions: '[["fill", 3, "Simar"], ["click", 9]]' or - for stdin""")
+    d.add_argument("json")
+    sub.add_parser("wait", help="wait SECONDS (max 10)").add_argument("seconds")
     sub.add_parser("press", help="press a key: Enter, Tab, Escape, ArrowDown, ...").add_argument("key")
     sub.add_parser("scroll", help="scroll the page").add_argument("direction", choices=["up", "down"])
     sub.add_parser("back", help="browser back")
@@ -117,24 +166,13 @@ def main(argv=None):
             print(check(tab.snapshot()))
         elif args.cmd == "read":
             print(tab.read(args.max))
-        elif args.cmd == "click":
-            tab.click(args.n)
-            print("ok")
-        elif args.cmd == "fill":
-            tab.fill(args.n, args.text)
-            print("ok")
-        elif args.cmd == "select":
-            print(f"ok: {tab.select(args.n, args.option)}")
-        elif args.cmd == "pick":
-            print(f"ok: {tab.pick(args.n, args.text)}")
-        elif args.cmd == "upload":
-            print(f"ok: {tab.upload(args.n, args.path)}")
-        elif args.cmd == "press":
-            tab.press(args.key)
-            print("ok")
+        elif args.cmd == "do":
+            return batch(tab, sys.stdin.read() if args.json == "-" else args.json)
         elif args.cmd == "close":
             tab.close()
             print("ok")
+        else:
+            print(act(tab, args.cmd, [getattr(args, k) for k in ACTIONS[args.cmd][0]]))
     except ActionError as e:
         print(f"error: {e}")
         return 1

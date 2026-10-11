@@ -74,3 +74,15 @@ def test_check_all_clear():
     from sudo_get_a_job.cli import check
 
     assert check(snap([])) == "ok: all required fields filled"
+
+
+def test_act_rejects_unknown_actions_and_wrong_arity():
+    import pytest
+
+    from sudo_get_a_job.browser import ActionError
+    from sudo_get_a_job.cli import act
+
+    with pytest.raises(ActionError, match="unknown action 'eval'"):
+        act(None, "eval", ["alert(1)"])
+    with pytest.raises(ActionError, match="fill takes N TEXT"):
+        act(None, "fill", [3])
