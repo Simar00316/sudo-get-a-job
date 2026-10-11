@@ -5,6 +5,7 @@ import json
 import sys
 import time
 
+from . import tracker
 from .browser import ActionError, Tab
 
 
@@ -124,7 +125,29 @@ def batch(tab, raw):
     return code
 
 
-def main(argv=None):
+def track(args):
+    try:
+        if args.track == "add":
+            tracker.add(args.company, args.role, args.url, args.platform, args.status, args.notes)
+            print(f"ok: tracked in {tracker.tracker_file()}")
+        elif args.track == "has":
+            row = tracker.find(args.url)
+            print(f"yes: {row['Date']} {row['Status']} — {row['Company']}, {row['Role']}" if row else "no")
+        elif args.track == "set":
+            tracker.set_status(args.url, args.status, args.notes)
+            print("ok")
+        elif args.track == "list":
+            path = tracker.tracker_file()
+            print(path.read_text(encoding="utf-8") if path.exists() else "no applications yet")
+        else:
+            print(tracker.tracker_file())
+    except ValueError as e:
+        print(f"error: {e}")
+        return 1
+    return 0
+
+
+def parser():
     p = argparse.ArgumentParser(prog="sgaj", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("open", help="open URL in a new tab and remember it").add_argument("url")
@@ -156,10 +179,29 @@ def main(argv=None):
     sub.add_parser("scroll", help="scroll the page").add_argument("direction", choices=["up", "down"])
     sub.add_parser("back", help="browser back")
     sub.add_parser("close", help="close the tab")
-    args = p.parse_args(argv)
+    t = sub.add_parser("track", help="the applications.md tracker").add_subparsers(dest="track", required=True)
+    ta = t.add_parser("add", help="record a job (refuses duplicates by URL)")
+    for name in ("company", "role", "url", "platform"):
+        ta.add_argument(name)
+    ta.add_argument("--status", default="applied", choices=tracker.STATUSES)
+    ta.add_argument("--notes", default="")
+    t.add_parser("has", help="is this job URL already tracked?").add_argument("url")
+    ts = t.add_parser("set", help="change a job's status")
+    ts.add_argument("url")
+    ts.add_argument("status", choices=tracker.STATUSES)
+    ts.add_argument("--notes")
+    t.add_parser("list", help="print the tracker")
+    t.add_parser("path", help="print the tracker file path")
+    return p
+
+
+def main(argv=None):
+    args = parser().parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
+    if args.cmd == "track":
+        return track(args)
     if args.cmd == "tabs":
         current = Tab.remembered()
         for i, t in enumerate(Tab.pages(), 1):
