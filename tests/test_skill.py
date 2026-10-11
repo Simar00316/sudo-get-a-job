@@ -22,10 +22,10 @@ def test_frontmatter_has_name_and_trigger_description():
 
 
 def test_referenced_files_exist():
+    names = {Path(d).name for d in DOCS} | {"profile.md", "applications.md"}
     for doc, text in DOCS.items():
-        for ref in re.findall(r"`((?:references/)?[\w-]+\.md)`", text):
-            assert ref in DOCS or f"references/{ref}" in DOCS or ref in {"profile.md", "applications.md"}, \
-                f"{doc} references missing {ref}"
+        for ref in re.findall(r"`((?:[\w-]+/)*[\w-]+\.md)`", text):
+            assert ref in DOCS or (ref.count("/") == 0 and ref in names), f"{doc} references missing {ref}"
 
 
 def test_every_sgaj_command_in_the_docs_exists():
