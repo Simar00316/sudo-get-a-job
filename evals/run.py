@@ -322,10 +322,26 @@ def full_application_end_to_end():
     }
 
 
+@scenario()
+def labels_exclude_status_and_error_text():
+    look = sgaj("open", page("labels.html"))
+    assert 'textbox "Current location ✱" = ""' in look, look
+    assert 'textbox "Email" = ""' in look, look
+    assert 'link "ATTACH RESUME/CV"' in look, look
+    assert "No location found" not in look and "valid email" not in look and "Analyzing" not in look, look
+
+
+@scenario()
+def multi_line_links_keep_all_their_lines():
+    look = sgaj("open", page("labels.html"))
+    assert 'link "Senior AI Engineer Acme AI Remote, India"' in look, look
+
+
 # --- runner ---------------------------------------------------------------------------------------
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")
     pick = sys.argv[sys.argv.index("-k") + 1] if "-k" in sys.argv else ""
     chosen = [(fn, xf) for fn, xf in SCENARIOS if pick in fn.__name__]
     results = []

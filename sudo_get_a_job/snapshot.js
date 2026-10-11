@@ -41,16 +41,19 @@
   const safe = e => !['password', 'hidden'].includes(e.type);
   const visible = e => !e.closest('[aria-hidden="true"],[inert]') &&
     e.checkVisibility({checkOpacity: true, checkVisibilityCSS: true});
-  const name = (e, seen = new Set()) => {
+  // Status/error text and the control's own subtree are not part of a field's name.
+  const noise = (n, control) => n.getAttribute('aria-hidden') === 'true' || (control && n.contains(control)) ||
+    ['alert', 'status'].includes(n.getAttribute('role')) || ![null, 'off'].includes(n.getAttribute('aria-live'));
+  const name = (e, seen = new Set(), control = null) => {
     if (!e || seen.has(e)) return '';
     seen.add(e);
     const referenced = (e.getAttribute('aria-labelledby') || '').split(/\s+/)
       .map(id => name(byId(e, id), seen)).filter(Boolean).join(' ');
     return referenced || e.getAttribute('aria-label') ||
-      [...(e.labels || [])].map(l => name(l, seen)).filter(Boolean).join(' ') ||
+      [...(e.labels || [])].map(l => name(l, seen, e)).filter(Boolean).join(' ') ||
       (['button', 'submit', 'reset'].includes(e.type) ? e.value : '') || e.getAttribute('alt') ||
       (e.tagName === 'INPUT' ? '' : [...e.childNodes].map(n => n.nodeType === 3 ? n.textContent :
-        n.nodeType === 1 && n.getAttribute('aria-hidden') !== 'true' ? name(n, seen) : '').join(' ').trim()) ||
+        n.nodeType === 1 && !noise(n, control) ? name(n, seen, control) : '').join(' ').trim()) ||
       e.getAttribute('title') || e.getAttribute('placeholder') || '';
   };
   // File inputs are usually visually hidden behind a styled button; name them from their field.
