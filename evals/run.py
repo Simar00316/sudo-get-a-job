@@ -9,6 +9,7 @@ A scenario marked xfail="#N" documents a known gap tracked in issue N; it must n
 
 import contextlib
 import io
+import json
 import re
 import sys
 import time
@@ -390,6 +391,35 @@ def visible_captcha_is_reported_invisible_one_ignored():
     assert look.count("captcha: recaptcha") == 1, look
     assert "frame (cross-origin" not in look, look
     assert "captcha: recaptcha" in sgaj("check")
+
+
+@scenario()
+def batch_fills_a_whole_step_in_one_call():
+    look = sgaj("open", page("apply.html"))
+    out = sgaj("do", json.dumps([
+        ["fill", idx(look, "First name"), "Simarpreet"], ["fill", idx(look, "Last name"), "Singh"],
+        ["fill", idx(look, "Email"), "s@example.com"], ["fill", idx(look, "Phone"), "+91 98765 43210"],
+        ["pick", idx(look, "Current location"), "Lucknow"], ["upload", idx(look, "Resume/CV", "file"), str(RESUME)],
+        ["click", idx(look, "Next")],
+    ]))
+    assert out.count(": ok") == 7, out
+    idx(out, "LinkedIn profile")  # fresh look of step 2 is printed after the batch
+
+
+@scenario()
+def batch_stops_at_first_error():
+    look = sgaj("open", page("apply.html"))
+    out = sgaj("do", json.dumps([["fill", idx(look, "First name"), "A"], ["click", 99999],
+                                 ["fill", idx(look, "Last name"), "B"]]))
+    assert "2 click 99999: error" in out and "stopped" in out, out
+    assert dom("[fn.value, ln.value]") == ["A", ""]
+
+
+@scenario()
+def batch_rejects_bad_json_and_unknown_actions():
+    sgaj("open", page("apply.html"))
+    assert "error" in sgaj("do", "[[fill, 1]]")
+    assert "unknown action" in sgaj("do", '[["eval", "alert(1)"]]')
 
 
 # --- runner ---------------------------------------------------------------------------------------
