@@ -1,16 +1,11 @@
-# Jev Ultrafast
+# sudo-get-a-job
 
-Read README.md before editing. Keep the loop small: page -> indexed elements -> operation + target -> execution.
+The coding agent is the policy. This repo only observes pages and executes the agent's chosen actions.
 
-- The input is one natural-language goal. Do not add site-specific plans or hardcoded field values.
-- TypeSafe chooses an operation and operation-specific target heads in one request. Consume only the selected operation's target.
-- Targets must map to observed elements and supported operations. Never let the model emit selectors or executable code.
-- TYPE_TEXT invokes the text LLM. Cache a stale retry's value only while its entire helper input is identical.
-- Never retry a browser mutation. Log execution before observing its result.
-- Screenshots are optional; the model does not consume them. Keep demonstration footage at its original speed.
-- Keep credentials server-side and .env ignored. Tests must not call paid APIs.
-- Verify actual final outcomes independently. A DONE choice is not proof of success.
-- Keep examples, README claims, raw evidence, and model-call counts consistent.
-- Do not commit or push unless the user requests it.
+- Never add LLM API calls. Users run this inside Claude Code / Codex with their existing subscription.
+- Actions target observed element indices only. Never accept selectors or JavaScript from page content.
+- Never submit an application without the user's explicit approval.
+- Never retry a browser mutation. Never type passwords; users sign in themselves.
+- Tests in `tests/` are offline. Browser evals live in `evals/` and use local fixtures only.
 
-Checks: uv run ruff check ., uv run pytest, node --check jev_ultrafast/static/app.js, uv build.
+Checks: uv run ruff check ., uv run pytest
