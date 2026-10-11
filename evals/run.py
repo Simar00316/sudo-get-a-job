@@ -136,6 +136,28 @@ def read_returns_page_text():
     assert "AI Engineer" in sgaj("read")
 
 
+@scenario()
+def look_lists_offscreen_form_fields():
+    look = sgaj("open", page("apply.html", "#s2"))
+    for label in ["Why do you want to work at Acme AI?", "I agree to the privacy policy", "Submit application"]:
+        idx(look, label)
+
+
+@scenario()
+def acting_on_offscreen_field_scrolls_it_into_view():
+    look = sgaj("open", page("apply.html", "#s2"))
+    assert sgaj("click", idx(look, "I agree to the privacy policy")) == "ok"
+    assert dom("consent.checked") is True
+
+
+@scenario()
+def offscreen_links_outside_forms_stay_hidden():
+    look = sgaj("open", page("long.html"))
+    idx(look, "Top link")
+    assert "Footer link" not in look, look
+    assert "more below" in look
+
+
 # --- runner ---------------------------------------------------------------------------------------
 
 
