@@ -34,16 +34,29 @@ RESOLVE = """(node => {
     return {error: `Element [${node}] is disabled.`};
   if (!e.checkVisibility({checkOpacity: true, checkVisibilityCSS: true}))
     return {error: `Element [${node}] is hidden.`};
-  let r = e.getBoundingClientRect();
-  if (r.top < 0 || r.left < 0 || r.bottom > innerHeight || r.right > innerWidth) {
+  // Click point in top-window coordinates; verify every layer (shadow root, frame) isn't covered there.
+  const place = () => {
+    const r = e.getBoundingClientRect();
+    let el = e, x = r.x + r.width / 2, y = r.y + r.height / 2;
+    for (;;) {
+      const root = el.getRootNode(), hit = root.elementFromPoint(x, y);
+      if (!hit || !(hit === el || el.contains(hit) || hit.contains(el))) return {r, x, y, covered: true};
+      if (root.host) { el = root.host; continue; }
+      const frame = root.defaultView?.frameElement;
+      if (!frame) return {r, x, y};
+      const f = frame.getBoundingClientRect();
+      x += f.x + frame.clientLeft; y += f.y + frame.clientTop; el = frame;
+    }
+  };
+  const inView = p => p.r.width && p.r.height && p.x >= 0 && p.y >= 0 && p.x < innerWidth && p.y < innerHeight;
+  let p = place();
+  if (!inView(p) || p.covered) {
     e.scrollIntoView({block: 'center', inline: 'center', behavior: 'instant'});
-    r = e.getBoundingClientRect();
+    p = place();
   }
-  const x = r.x + r.width / 2, y = r.y + r.height / 2;
-  if (!r.width || !r.height || x < 0 || y < 0 || x >= innerWidth || y >= innerHeight)
-    return {error: `Element [${node}] could not be scrolled into view.`};
-  const hit = document.elementFromPoint(x, y);
-  if (!e.contains(hit) && !hit?.contains(e)) return {error: `Element [${node}] is covered by another element.`};
+  if (!inView(p)) return {error: `Element [${node}] could not be scrolled into view.`};
+  if (p.covered) return {error: `Element [${node}] is covered by another element.`};
+  const {x, y} = p;
   return {x, y, tag: e.tagName, readOnly: !!e.readOnly};
 })"""
 

@@ -38,6 +38,8 @@ def render(snap):
         if a.get("expanded") == "true":
             line += " (expanded)"
         lines.append(line)
+    for f in snap.get("frames", []):
+        lines.append(f"frame (cross-origin, not readable here): {clip(f['src'], 120)} -> sgaj goto it to fill")
     if snap["omitted_actions"]:
         lines.append(f"… {snap['omitted_actions']} more elements not shown")
     if y + snap["h"] < height - 2:
