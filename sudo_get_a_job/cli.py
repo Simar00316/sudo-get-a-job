@@ -128,6 +128,10 @@ def main(argv=None):
     p = argparse.ArgumentParser(prog="sgaj", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("open", help="open URL in a new tab and remember it").add_argument("url")
+    sub.add_parser("tabs", help="list open tabs; * marks the current one")
+    a = sub.add_parser("attach", help="make an existing tab current: number from tabs, or text in its title/URL")
+    a.add_argument("which")
+    sub.add_parser("show", help="bring the current tab to the front (e.g. for the user to solve a captcha)")
     sub.add_parser("goto", help="navigate the current tab").add_argument("url")
     sub.add_parser("look", help="list interactive elements")
     sub.add_parser("check", help="list empty required fields, alerts and captchas before submitting")
@@ -156,9 +160,18 @@ def main(argv=None):
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
-    tab = Tab.new(args.url) if args.cmd == "open" else Tab.current()
+    if args.cmd == "tabs":
+        current = Tab.remembered()
+        for i, t in enumerate(Tab.pages(), 1):
+            print(f"{'*' if t['targetId'] == current else ' '} [{i}] {clip(t['title'], 70)} — {clip(t['url'], 90)}")
+        return 0
     try:
-        if args.cmd in {"open", "goto", "look", "back", "scroll"}:
+        tab = {"open": lambda: Tab.new(args.url), "attach": lambda: Tab.attach(args.which)}.get(args.cmd, Tab.current)()
+    except ActionError as e:
+        print(f"error: {e}")
+        return 1
+    try:
+        if args.cmd in {"open", "attach", "goto", "look", "back", "scroll"}:
             {"goto": lambda: tab.goto(args.url), "back": tab.back,
              "scroll": lambda: tab.scroll(args.direction)}.get(args.cmd, lambda: None)()
             print(render(tab.snapshot()))
@@ -168,6 +181,9 @@ def main(argv=None):
             print(tab.read(args.max))
         elif args.cmd == "do":
             return batch(tab, sys.stdin.read() if args.json == "-" else args.json)
+        elif args.cmd == "show":
+            tab.show()
+            print("ok")
         elif args.cmd == "close":
             tab.close()
             print("ok")

@@ -422,6 +422,32 @@ def batch_rejects_bad_json_and_unknown_actions():
     assert "unknown action" in sgaj("do", '[["eval", "alert(1)"]]')
 
 
+@scenario()
+def tabs_lists_pages_and_marks_current():
+    sgaj("open", page("questions.html"))
+    sgaj("open", page("labels.html"))
+    out = sgaj("tabs")
+    assert re.search(r"^\* \[\d+\] Noisy labels", out, re.M), out
+    assert re.search(r"^  \[\d+\] Screening questions", out, re.M), out
+
+
+@scenario()
+def attach_switches_to_existing_tab_by_text_or_number():
+    sgaj("open", page("questions.html"))
+    sgaj("open", page("labels.html"))
+    assert "Screening questions" in sgaj("attach", "questions.html")
+    assert "Are you open to relocation?" in sgaj("look")
+    n = re.search(r"\[(\d+)\] Noisy labels", sgaj("tabs"))[1]
+    assert "Noisy labels" in sgaj("attach", n)
+    assert "No tab matches" in sgaj("attach", "nothing-like-this")
+
+
+@scenario()
+def show_brings_tab_to_front():
+    sgaj("open", page("questions.html"))
+    assert sgaj("show") == "ok"
+
+
 # --- runner ---------------------------------------------------------------------------------------
 
 
