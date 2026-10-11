@@ -7,6 +7,7 @@ import time
 
 from . import tracker
 from .browser import ActionError, Tab
+from .install import install_skill
 
 
 def clip(s, n=80):
@@ -179,6 +180,9 @@ def parser():
     sub.add_parser("scroll", help="scroll the page").add_argument("direction", choices=["up", "down"])
     sub.add_parser("back", help="browser back")
     sub.add_parser("close", help="close the tab")
+    i = sub.add_parser("install-skill", help="copy the agent skill to ~/.claude/skills (and ~/.codex/skills)")
+    i.add_argument("--dest", action="append", help="install here instead (repeatable)")
+    sub.add_parser("doctor", help="check the browser connection")
     t = sub.add_parser("track", help="the applications.md tracker").add_subparsers(dest="track", required=True)
     ta = t.add_parser("add", help="record a job (refuses duplicates by URL)")
     for name in ("company", "role", "url", "platform"):
@@ -200,6 +204,13 @@ def main(argv=None):
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
+    if args.cmd == "install-skill":
+        for dest in install_skill(args.dest):
+            print(f"ok: skill installed in {dest}")
+        return 0
+    if args.cmd == "doctor":
+        print(f"ok: connected, {len(Tab.pages())} open tab(s). Workspace: {tracker.workspace()}")
+        return 0
     if args.cmd == "track":
         return track(args)
     if args.cmd == "tabs":
