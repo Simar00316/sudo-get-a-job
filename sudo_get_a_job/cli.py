@@ -159,6 +159,8 @@ def parser():
     sub.add_parser("goto", help="navigate the current tab").add_argument("url")
     sub.add_parser("look", help="list interactive elements")
     sub.add_parser("check", help="list empty required fields, alerts and captchas before submitting")
+    sub.add_parser("links", help="link texts and URLs on the page, e.g. job postings in search results") \
+        .add_argument("--match", default="", help="keep links whose URL contains this")
     sub.add_parser("read", help="page text, e.g. a job description").add_argument("--max", type=int, default=12000)
     sub.add_parser("click", help="click element N").add_argument("n")
     f = sub.add_parser("fill", help="replace the text of field N")
@@ -228,6 +230,8 @@ def main(argv=None):
             {"goto": lambda: tab.goto(args.url), "back": tab.back,
              "scroll": lambda: tab.scroll(args.direction)}.get(args.cmd, lambda: None)()
             print(render(tab.snapshot()))
+        elif args.cmd == "links":
+            print("\n".join(f"{clip(text, 100)} — {href}" for text, href in tab.links(args.match)) or "no links")
         elif args.cmd == "check":
             print(check(tab.snapshot()))
         elif args.cmd == "read":

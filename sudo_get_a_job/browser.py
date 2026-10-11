@@ -224,6 +224,17 @@ class Tab:
             ".find(e => e.innerText.length > 500); return (m || document.body).innerText; })()"
         )[:limit]
 
+    def links(self, match="", limit=100):
+        """Rendered links on the whole page, first text per URL, optionally filtered by URL substring."""
+        found = self.evaluate("""[...document.querySelectorAll('a[href]')]
+          .filter(a => a.checkVisibility({checkOpacity: true, checkVisibilityCSS: true}))
+          .map(a => [a.innerText.trim().replace(/\\s+/g, ' '), a.href])""") or []
+        out = {}
+        for text, href in found:
+            if match in href and href not in out:
+                out[href] = text
+        return [(text, href) for href, text in out.items()][:limit]
+
     def _resolve(self, node):
         if not str(node).isdigit():
             raise ActionError(f"Element must be a number from look, got {node!r}.")
