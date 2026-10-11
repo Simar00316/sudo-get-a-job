@@ -59,6 +59,9 @@ def main(argv=None):
     s = sub.add_parser("select", help="choose OPTION in native dropdown N")
     s.add_argument("n")
     s.add_argument("option")
+    k = sub.add_parser("pick", help="choose TEXT in dropdown/autocomplete N (types, waits, clicks the match)")
+    k.add_argument("n")
+    k.add_argument("text")
     u = sub.add_parser("upload", help="attach a file to file field N (or its upload button)")
     u.add_argument("n")
     u.add_argument("path")
@@ -86,6 +89,8 @@ def main(argv=None):
             print("ok")
         elif args.cmd == "select":
             print(f"ok: {tab.select(args.n, args.option)}")
+        elif args.cmd == "pick":
+            print(f"ok: {tab.pick(args.n, args.text)}")
         elif args.cmd == "upload":
             print(f"ok: {tab.upload(args.n, args.path)}")
         elif args.cmd == "press":

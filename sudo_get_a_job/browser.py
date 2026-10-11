@@ -80,6 +80,32 @@ FILE_TRIGGER = """(node => {
   return trigger ? (window.__jevFast.ids.get(f) ?? node) : null;
 })"""
 
+# Visible options for an opened dropdown/autocomplete, registered so they can be clicked by id.
+OPTIONS = """(node => {
+  const c = window.__jevFast, e = c.nodes.get(node);
+  const ids = (e?.getAttribute('aria-controls') || e?.getAttribute('aria-owns') || '').split(/\\s+/).filter(Boolean);
+  const roots = ids.map(id => document.getElementById(id)).filter(Boolean);
+  const found = (roots.length ? roots : [document]).flatMap(r => [...r.querySelectorAll('[role=option]')]);
+  return found.filter(o => o.checkVisibility({checkOpacity: true, checkVisibilityCSS: true}) &&
+      o.getAttribute('aria-disabled') !== 'true' && o.getBoundingClientRect().height > 0)
+    .map(o => {
+      if (!c.ids.has(o)) c.ids.set(o, c.next++);
+      c.nodes.set(c.ids.get(o), o);
+      return {id: c.ids.get(o), text: o.innerText.trim()};
+    });
+})"""
+
+
+def best_option(options, want):
+    """Exact, then prefix, then substring match (case-insensitive). Ties keep the site's order."""
+    want = " ".join(want.split()).casefold()
+    for test in (lambda t: t == want, lambda t: t.startswith(want), lambda t: want in t):
+        for o in options:
+            if test(" ".join(o["text"].split()).casefold()):
+                return o
+    return None
+
+
 KEYS = {"Enter": 13, "Tab": 9, "Escape": 27, "Backspace": 8, "ArrowDown": 40, "ArrowUp": 38, "Space": 32}
 
 
@@ -188,6 +214,27 @@ class Tab:
         if "error" in r:
             raise ActionError(r["error"])
         return r["selected"]
+
+    def pick(self, node, text, timeout=3.0):
+        """Choose `text` in a native select, custom dropdown or autocomplete. Returns the chosen option."""
+        t = self._resolve(node)
+        if t["tag"] == "SELECT":
+            return self.select(node, text)
+        editable = t["tag"] in {"INPUT", "TEXTAREA"} and not t["readOnly"]
+        self.fill(node, text) if editable else self.click(node)
+        deadline = time.monotonic() + timeout
+        options = []
+        while time.monotonic() < deadline:
+            time.sleep(0.1)
+            options = self.evaluate(f"{OPTIONS}({int(node)})") or []
+            if match := best_option(options, text):
+                self.click(match["id"])
+                return match["text"]
+        if not editable:
+            self.press("Escape")  # close the list we opened; nothing was chosen
+        listed = " | ".join(o["text"] for o in options[:15])
+        hint = f"Options: {listed}" if listed else "No options appeared."
+        raise ActionError(f"No option matching {text!r}. {hint}")
 
     def upload(self, node, path):
         path = Path(path).expanduser().resolve()

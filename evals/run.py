@@ -36,8 +36,12 @@ def scenario(xfail=None):
 
 def sgaj(*argv):
     out = io.StringIO()
-    with contextlib.redirect_stdout(out):
-        code = cli.main([str(a) for a in argv])
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+        try:
+            code = cli.main([str(a) for a in argv])
+        except SystemExit as e:  # argparse errors and "no tab" exits
+            code = e.code if isinstance(e.code, int) else 1
+            out.write(str(e.code) if not isinstance(e.code, int) else "")
     text = out.getvalue().strip()
     if argv[0] in {"open", "goto", "look", "scroll", "back"}:
         LOOK_SIZES.append(len(text))
@@ -218,6 +222,49 @@ def answering_one_group_leaves_the_other_visible():
     sgaj("click", no)
     assert dom("document.querySelector('[name=\"cards[q2]\"]:checked').value") == "No"
     assert dom("document.querySelector('[name=auth]:checked')") is None
+
+
+@scenario()
+def pick_autocomplete_suggestion():
+    look = sgaj("open", page("apply.html"))
+    assert sgaj("pick", idx(look, "Current location"), "Lucknow") == "ok: Lucknow, Uttar Pradesh, India"
+    assert dom("[loc.value, locChosen]") == ["Lucknow, Uttar Pradesh, India"] * 2
+
+
+@scenario()
+def pick_custom_dropdown_and_show_its_value():
+    look = sgaj("open", page("apply.html", "#s2"))
+    assert sgaj("pick", idx(look, "Notice period"), "30 days") == "ok: 30 days"
+    assert dom("np.dataset.v") == "30 days"
+    assert 'combobox "Notice period *" = "30 days"' in sgaj("look")
+
+
+@scenario()
+def pick_without_match_lists_options_and_changes_nothing():
+    look = sgaj("open", page("apply.html", "#s2"))
+    out = sgaj("pick", idx(look, "Notice period"), "90 days")
+    assert "No option matching" in out and "60+ days" in out, out
+    assert dom("np.dataset.v") is None
+
+
+@scenario()
+def pick_on_native_select_selects():
+    look = sgaj("open", page("apply.html", "#s2"))
+    assert sgaj("pick", idx(look, "Years of professional experience"), "2-4") == "ok: 2-4"
+    assert dom("yoe.value") == "2-4"
+
+
+@scenario()
+def complete_step1_and_advance():
+    look = sgaj("open", page("apply.html"))
+    for label, value in {"First name": "Simarpreet", "Last name": "Singh", "Email": "s@example.com",
+                         "Phone": "+91 98765 43210"}.items():
+        sgaj("fill", idx(look, label), value)
+    sgaj("pick", idx(look, "Current location"), "Lucknow")
+    sgaj("upload", idx(look, "Resume/CV", "file"), RESUME)
+    sgaj("click", idx(look, "Next"))
+    assert dom("e1.textContent") == "", dom("e1.textContent")
+    idx(sgaj("look"), "LinkedIn profile")
 
 
 # --- runner ---------------------------------------------------------------------------------------

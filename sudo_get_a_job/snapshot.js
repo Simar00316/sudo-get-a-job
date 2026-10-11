@@ -107,8 +107,13 @@
       const editable = !e.readOnly && e.getAttribute('aria-readonly') !== 'true' &&
         (['textbox', 'searchbox', 'spinbutton'].includes(rname) ||
           (rname === 'combobox' && ['INPUT', 'TEXTAREA'].includes(e.tagName)));
-      const value = 'value' in e ? String(e.value) :
-        e.isContentEditable || rname === 'combobox' ? e.innerText.trim() : '';
+      // Button-style dropdowns show their choice as text; React-Select keeps it beside an empty input.
+      const popup = ['listbox', 'true', 'menu', 'dialog'].includes(e.getAttribute('aria-haspopup'));
+      if (popup && rname === 'button') base.role = 'combobox';
+      let value = 'value' in e && e.tagName !== 'BUTTON' ? String(e.value) :
+        e.isContentEditable || base.role === 'combobox' ? e.innerText.trim() : '';
+      if (rname === 'combobox' && e.tagName === 'INPUT' && !value)
+        value = e.closest('[class*="control"]')?.innerText.trim() || '';
       actions.push({...base, kind: editable ? 'fill' : 'click', value});
     }
   }
