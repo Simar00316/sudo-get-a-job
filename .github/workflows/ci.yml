@@ -14,6 +14,16 @@ jobs:
       - run: uv sync
       - run: uv run ruff check .
       - run: uv run pytest
+      - name: Wheel bundles the skill
+        run: |
+          uv build
+          unzip -l dist/*.whl | grep -q "sudo_get_a_job/skill/SKILL.md"
+      - name: Install as a uv tool, like users do
+        run: |
+          uv tool install --python 3.12 .
+          sgaj --help > /dev/null
+          sgaj install-skill --dest "$RUNNER_TEMP/skills/sudo-get-a-job"
+          test -f "$RUNNER_TEMP/skills/sudo-get-a-job/references/apply.md"
       - name: Browser evals
         run: uv run python evals/run.py
         env:
