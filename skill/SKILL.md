@@ -17,7 +17,7 @@ Everything lives in the workspace folder that `sgaj doctor` prints (default `~/j
 
 ## Start of every session
 
-1. Run `sgaj doctor`. It checks the browser connection and prints the workspace path. If it prints setup steps instead, walk the user through them and retry.
+1. Run `sgaj doctor`. It checks the browser connection and prints the workspace path. If it prints setup steps instead, walk the user through them and retry. If it says Chrome is waiting for approval, ask the user to click **Allow** in Chrome, then retry.
 2. If the workspace has no `profile.md`, run onboarding: read `references/onboarding.md` and follow it.
 3. Read `profile.md`. Note the approval mode and the daily limit.
 

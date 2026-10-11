@@ -11,6 +11,9 @@ HOWTO = """No browser with remote debugging found.
   3. Run the command again and click "Allow" if Chrome asks.
 (Advanced: set SGAJ_CDP_WS=ws://127.0.0.1:PORT/devtools/browser/ID to pick a browser explicitly.)"""
 
+ALLOW = """Chrome is waiting for you to approve the connection.
+  Look for an "Allow remote debugging?" prompt in Chrome, click Allow, then run the command again."""
+
 _PROFILES = {
     "Windows": ["Google/Chrome/User Data", "Google/Chrome Beta/User Data", "Microsoft/Edge/User Data",
                 "BraveSoftware/Brave-Browser/User Data", "Chromium/User Data"],
@@ -59,5 +62,24 @@ def connect():
     from browser_harness.admin import ensure_daemon
     from browser_harness.helpers import cdp
 
-    ensure_daemon(name=os.environ["BU_NAME"], env={"BU_CDP_WS": ws})
+    try:
+        ensure_daemon(name=os.environ["BU_NAME"], env={"BU_CDP_WS": ws})
+    except RuntimeError as e:
+        if "handshake" in str(e).lower():
+            raise SystemExit(ALLOW) from None
+        raise
     return cdp
+
+
+def stop():
+    """Stop every sudo-get-a-job browser daemon (needed before upgrading on Windows). Returns their names."""
+    from contextlib import suppress
+
+    from browser_harness import _ipc
+    from browser_harness.admin import restart_daemon
+
+    names = sorted({p.name.split(".")[0].removeprefix("bu-") for p in _ipc._RUNTIME.glob("bu-sgaj_*.*")})
+    for name in names:
+        with suppress(OSError):  # Windows may briefly hold the port file; the daemon is gone either way
+            restart_daemon(name)
+    return names

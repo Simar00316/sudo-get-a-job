@@ -45,5 +45,8 @@ If the agent does not list the skill automatically, tell the user it will load a
 ## Updating later
 
 ```bash
+sgaj stop
 uv tool upgrade sudo-get-a-job && sgaj install-skill
 ```
+
+`sgaj stop` ends the background browser connection first; on Windows an upgrade fails with "Access is denied" while it runs. If an upgrade was already interrupted and `sgaj` now fails with `No module named 'sudo_get_a_job'`, stop any `python.exe` running from `uv/tools/sudo-get-a-job`, then reinstall with the step 2 command plus `--force`. After an upgrade Chrome may ask once more to **Allow** the connection.
