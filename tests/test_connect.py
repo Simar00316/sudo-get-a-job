@@ -36,3 +36,18 @@ def test_no_profile_explains_how_to_enable(monkeypatch, tmp_path):
     with pytest.raises(SystemExit) as e:
         find_ws([tmp_path / "missing"])
     assert str(e.value) == HOWTO
+
+
+def test_pending_allow_prompt_gives_instructions_not_a_traceback(monkeypatch):
+    import browser_harness.admin
+
+    from sudo_get_a_job import connect
+
+    def handshake_timeout(**_):
+        raise RuntimeError("fatal: CDP WS handshake failed: timed out during opening handshake")
+
+    monkeypatch.setenv("SGAJ_CDP_WS", "ws://127.0.0.1:1/devtools/browser/x")
+    monkeypatch.setattr(browser_harness.admin, "ensure_daemon", handshake_timeout)
+    with pytest.raises(SystemExit) as e:
+        connect.connect()
+    assert "click Allow" in str(e.value)

@@ -7,6 +7,7 @@ import time
 
 from . import tracker
 from .browser import ActionError, Tab
+from .connect import stop
 from .install import install_skill
 
 
@@ -185,6 +186,7 @@ def parser():
     i = sub.add_parser("install-skill", help="copy the agent skill to ~/.claude/skills (and ~/.codex/skills)")
     i.add_argument("--dest", action="append", help="install here instead (repeatable)")
     sub.add_parser("doctor", help="check the browser connection")
+    sub.add_parser("stop", help="stop the background browser connection (run before upgrading)")
     t = sub.add_parser("track", help="the applications.md tracker").add_subparsers(dest="track", required=True)
     ta = t.add_parser("add", help="record a job (refuses duplicates by URL)")
     for name in ("company", "role", "url", "platform"):
@@ -209,6 +211,10 @@ def main(argv=None):
     if args.cmd == "install-skill":
         for dest in install_skill(args.dest):
             print(f"ok: skill installed in {dest}")
+        return 0
+    if args.cmd == "stop":
+        names = stop()
+        print(f"ok: stopped {len(names)} browser connection(s)" if names else "ok: nothing running")
         return 0
     if args.cmd == "doctor":
         print(f"ok: connected, {len(Tab.pages())} open tab(s). Workspace: {tracker.workspace()}")
