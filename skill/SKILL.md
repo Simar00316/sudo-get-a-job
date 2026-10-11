@@ -39,6 +39,20 @@ Everything lives in `~/job-hunt/` (override with `SGAJ_WORKSPACE`):
 
 Element numbers stay the same for the same element across `look` calls. If an action says an element is gone or covered, run `look` again. A cookie banner or modal is usually the cause.
 
+## Platforms
+
+Before working on a site, read its notes. They cover search URLs, the apply flow and the traps:
+
+- LinkedIn: `references/platforms/linkedin.md`
+- Indeed: `references/platforms/indeed.md`
+- Wellfound: `references/platforms/wellfound.md`
+- Naukri: `references/platforms/naukri.md`
+- Company career sites (Greenhouse, Lever, Ashby, Workday, others): `references/platforms/ats.md`
+
+## Finding jobs
+
+Open the platform's search URL with the user's filters, then collect postings with `sgaj links --match <posting URL pattern>`. Skip any already in the tracker (`sgaj track has URL`). Work through the queue one job at a time and give the user a short progress line after each one.
+
 ## Applying
 
 Read `references/apply.md` before the first application of a session. The short version, per job:
