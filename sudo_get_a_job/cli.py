@@ -37,14 +37,45 @@ def render(snap):
             line += f" = \"{clip(a.get('value', ''), 60)}\""
         if a.get("expanded") == "true":
             line += " (expanded)"
+        if a.get("required") and a.get("empty"):
+            line += " (required)"
+        if a.get("invalid"):
+            line += " (invalid)"
         lines.append(line)
     for f in snap.get("frames", []):
         lines.append(f"frame (cross-origin, not readable here): {clip(f['src'], 120)} -> sgaj goto it to fill")
+    lines += footer(snap)
     if snap["omitted_actions"]:
         lines.append(f"… {snap['omitted_actions']} more elements not shown")
     if y + snap["h"] < height - 2:
         lines.append("more below: scroll down")
     return "\n".join(lines)
+
+
+def footer(snap):
+    lines = [f"alerts: {' | '.join(clip(a, 150) for a in snap['alerts'])}"] if snap.get("alerts") else []
+    lines += [f"captcha: {c} (ask the user to solve it in the browser)" for c in snap.get("captchas", [])]
+    return lines
+
+
+def check(snap):
+    """Empty required fields (radio groups once, by question), plus alerts and captchas."""
+    missing, seen = [], set()
+    for a in snap["actions"]:
+        if not (a.get("required") and a.get("empty")) or a.get("node") in seen:
+            continue
+        seen.add(a["node"])
+        if a["role"] == "radio" and a.get("question"):
+            key = ("radio", a["question"])
+            if key in seen:
+                continue
+            seen.add(key)
+            missing.append(f"  [{a['node']}] radio group \"{clip(a['question'])}\"")
+        else:
+            role = "select" if a["kind"] == "select" else a["role"]
+            missing.append(f"  [{a['node']}] {role} \"{clip(a['label'].split(' → ')[0])}\"")
+    lines = ["missing required:", *missing] if missing else ["ok: all required fields filled"]
+    return "\n".join(lines + footer(snap))
 
 
 def main(argv=None):
@@ -53,6 +84,7 @@ def main(argv=None):
     sub.add_parser("open", help="open URL in a new tab and remember it").add_argument("url")
     sub.add_parser("goto", help="navigate the current tab").add_argument("url")
     sub.add_parser("look", help="list interactive elements")
+    sub.add_parser("check", help="list empty required fields, alerts and captchas before submitting")
     sub.add_parser("read", help="page text, e.g. a job description").add_argument("--max", type=int, default=12000)
     sub.add_parser("click", help="click element N").add_argument("n")
     f = sub.add_parser("fill", help="replace the text of field N")
@@ -81,6 +113,8 @@ def main(argv=None):
             {"goto": lambda: tab.goto(args.url), "back": tab.back,
              "scroll": lambda: tab.scroll(args.direction)}.get(args.cmd, lambda: None)()
             print(render(tab.snapshot()))
+        elif args.cmd == "check":
+            print(check(tab.snapshot()))
         elif args.cmd == "read":
             print(tab.read(args.max))
         elif args.cmd == "click":

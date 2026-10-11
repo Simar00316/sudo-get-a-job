@@ -9,7 +9,8 @@
   for (const [id, e] of cache.nodes) if (!e.isConnected) cache.nodes.delete(id);
   // Every tree we can read: the document, open shadow roots and same-origin frames, recursively.
   // Cross-origin frames can't be read; they are reported so the agent knows something is there.
-  const roots = [], frames = [];
+  const roots = [], frames = [], captchas = [];
+  const CAPTCHA = /(recaptcha|hcaptcha|turnstile|challenges\.cloudflare|arkoselabs|funcaptcha)/i;
   const collect = root => {
     roots.push(root);
     for (const el of root.querySelectorAll('*')) {
@@ -20,8 +21,11 @@
       try { doc = el.contentDocument; } catch {}
       if (doc?.body) collect(doc);
       else {
-        const r = el.getBoundingClientRect();
-        if (r.width * r.height > 2000) frames.push({src: el.src || el.getAttribute('src') || '', w: r.width, h: r.height});
+        const r = el.getBoundingClientRect(), src = el.src || el.getAttribute('src') || '';
+        const captcha = src.match(CAPTCHA);
+        // Invisible reCAPTCHA badges need no user action; visible challenges do.
+        if (captcha) { if (!/size=invisible/.test(src) && r.width * r.height > 2000) captchas.push(captcha[1]); }
+        else if (r.width * r.height > 2000) frames.push({src, w: r.width, h: r.height});
       }
     }
   };
@@ -133,6 +137,16 @@
       const q = question(e);
       if (q && q !== base.label) base.question = q;
     }
+    if (formRoles.includes(base.role) || e.tagName === 'SELECT') {
+      const group = e.type === 'radio' && e.name ?
+        [...e.getRootNode().querySelectorAll('input[type=radio]')].filter(x => x.name === e.name) : [e];
+      base.required = group.some(x => x.required || x.getAttribute('aria-required') === 'true') ||
+        /[*✱]/.test(base.label + ' ' + (base.question || ''));
+      base.empty = e.type === 'radio' ? !group.some(x => x.checked) : e.type === 'checkbox' ? !e.checked :
+        e.tagName === 'SELECT' ? e.value === '' :
+        !('value' in e && e.tagName !== 'BUTTON' ? e.value : e.innerText).trim();
+      if (e.getAttribute('aria-invalid') === 'true') base.invalid = true;
+    }
     if (e.tagName === 'SELECT') {
       for (const o of e.options) if (!o.selected && !o.disabled && !o.closest('optgroup[disabled]'))
         actions.push({...base, kind: 'select', value: o.value,
@@ -151,9 +165,17 @@
       actions.push({...base, kind: editable ? 'fill' : 'click', value});
     }
   }
+  // Visible validation messages, deduplicated; never containers that hold form controls.
+  const alerts = [];
+  for (const a of roots.flatMap(r => [...r.querySelectorAll('[role="alert"],[aria-live="assertive"],[class*="error" i]')])) {
+    const text = a.innerText?.trim().replace(/\s+/g, ' ');
+    if (!text || text.length > 300 || a.querySelector('input,select,textarea') || !visible(a)) continue;
+    if (!alerts.some(t => t.includes(text) || text.includes(t))) alerts.push(text);
+    if (alerts.length >= 8) break;
+  }
   const height = document.documentElement.scrollHeight;
   const omitted_actions = Math.max(0, actions.length - 250);
   actions.splice(250);
   return {url: location.href, title: document.title, h: innerHeight, scroll: {y: Math.round(scrollY), height},
-    actions, omitted_actions, frames};
+    actions, omitted_actions, frames, alerts, captchas: [...new Set(captchas)]};
 })()
