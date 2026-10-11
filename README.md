@@ -46,6 +46,15 @@ A typical form page costs **about 100 tokens**, and the agent fills a whole step
 sgaj do '[["fill",12,"Simarpreet"],["select",15,"1-2"],["click",18],["pick",21,"Lucknow"],["upload",24,"resume.pdf"]]'
 ```
 
+**Measured end to end.** In the agent eval, Claude Code with only this skill completed a two-step, 18-field application (autocomplete, custom dropdown, iframe, web component, resume upload, sponsorship question) and tracked it. Every submitted value was verified:
+
+| Run | Checks | Turns | Time | Output tokens | Fresh input + cache writes | API-equivalent cost |
+|---|---|---|---|---|---|---|
+| 1 | 19/19 | 16 | 49 s | 2,470 | — | $0.42 |
+| 2 | 19/19 | 14 | 45 s | 2,303 | 29,687 | $0.39 |
+
+Most of the remaining tokens are Claude Code re-reading its own cached context each turn; the pages themselves are a small fraction. On a subscription, that's one short conversation per application.
+
 It is built for the parts of application forms where generic agents fail, each covered by a browser eval:
 
 | Problem on real forms | What `sgaj` does |
@@ -108,6 +117,7 @@ uv sync
 uv run ruff check .
 uv run pytest                 # offline unit tests
 uv run python evals/run.py    # browser evals: throwaway headless Chrome + local job-form fixtures
+uv run python evals/agent_eval.py   # Claude Code applies to a fixture job with only the skill (uses your subscription)
 ```
 
 Evals drive the real CLI against fixtures that reproduce real ATS patterns (Lever's label layout, Ashby's hidden uploads, React's value tracker, iframes, shadow DOM, captchas) and verify outcomes in the DOM. CI runs all three on every pull request.

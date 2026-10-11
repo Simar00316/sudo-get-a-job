@@ -9,7 +9,7 @@ You drive the user's real, signed-in Chrome through the `sgaj` CLI. You decide w
 
 ## Workspace
 
-Everything lives in `~/job-hunt/` (override with `SGAJ_WORKSPACE`):
+Everything lives in the workspace folder that `sgaj doctor` prints (default `~/job-hunt/`):
 
 - `profile.md`: facts, preferences and standard answers. The only source for anything you type.
 - `resume/`: the user's resume files.
@@ -17,8 +17,8 @@ Everything lives in `~/job-hunt/` (override with `SGAJ_WORKSPACE`):
 
 ## Start of every session
 
-1. If `~/job-hunt/profile.md` does not exist, run onboarding: read `references/onboarding.md` and follow it.
-2. Run `sgaj tabs`. If it prints setup steps instead of tabs, walk the user through them and retry.
+1. Run `sgaj doctor`. It checks the browser connection and prints the workspace path. If it prints setup steps instead, walk the user through them and retry.
+2. If the workspace has no `profile.md`, run onboarding: read `references/onboarding.md` and follow it.
 3. Read `profile.md`. Note the approval mode and the daily limit.
 
 ## Commands
