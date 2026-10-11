@@ -7,6 +7,37 @@
     const id = cache.ids.get(e); cache.nodes.set(id, e); return id;
   };
   for (const [id, e] of cache.nodes) if (!e.isConnected) cache.nodes.delete(id);
+  // Every tree we can read: the document, open shadow roots and same-origin frames, recursively.
+  // Cross-origin frames can't be read; they are reported so the agent knows something is there.
+  const roots = [], frames = [];
+  const collect = root => {
+    roots.push(root);
+    for (const el of root.querySelectorAll('*')) {
+      if (el.shadowRoot) collect(el.shadowRoot);
+      if (el.tagName !== 'IFRAME' && el.tagName !== 'FRAME') continue;
+      if (!el.checkVisibility({checkOpacity: true, checkVisibilityCSS: true})) continue;
+      let doc = null;
+      try { doc = el.contentDocument; } catch {}
+      if (doc?.body) collect(doc);
+      else {
+        const r = el.getBoundingClientRect();
+        if (r.width * r.height > 2000) frames.push({src: el.src || el.getAttribute('src') || '', w: r.width, h: r.height});
+      }
+    }
+  };
+  collect(document);
+  // Element rect in top-window coordinates, through any frames it lives in.
+  const topRect = e => {
+    const r = e.getBoundingClientRect();
+    let x = r.x, y = r.y;
+    for (let w = e.ownerDocument.defaultView; w.frameElement; w = w.parent) {
+      const f = w.frameElement.getBoundingClientRect();
+      x += f.x + w.frameElement.clientLeft;
+      y += f.y + w.frameElement.clientTop;
+    }
+    return {width: r.width, height: r.height, left: x, top: y, right: x + r.width, bottom: y + r.height};
+  };
+  const byId = (e, id) => e.getRootNode().getElementById?.(id) || document.getElementById(id);
   const safe = e => !['password', 'hidden'].includes(e.type);
   const visible = e => !e.closest('[aria-hidden="true"],[inert]') &&
     e.checkVisibility({checkOpacity: true, checkVisibilityCSS: true});
@@ -14,7 +45,7 @@
     if (!e || seen.has(e)) return '';
     seen.add(e);
     const referenced = (e.getAttribute('aria-labelledby') || '').split(/\s+/)
-      .map(id => name(document.getElementById(id), seen)).filter(Boolean).join(' ');
+      .map(id => name(byId(e, id), seen)).filter(Boolean).join(' ');
     return referenced || e.getAttribute('aria-label') ||
       [...(e.labels || [])].map(l => name(l, seen)).filter(Boolean).join(' ') ||
       (['button', 'submit', 'reset'].includes(e.type) ? e.value : '') || e.getAttribute('alt') ||
@@ -38,7 +69,7 @@
     const groupName = group && name(group, new Set([...group.querySelectorAll('*')]));
     if (groupName) return groupName;
     if (!e.name) return '';
-    const options = [...document.querySelectorAll('input')].filter(x => x.name === e.name && x.type === e.type);
+    const options = [...e.getRootNode().querySelectorAll('input')].filter(x => x.name === e.name && x.type === e.type);
     let box = e.parentElement;
     while (box && !options.every(x => box.contains(x))) box = box.parentElement;
     // Grow until the box also holds the question text, but never across another option group.
@@ -73,11 +104,11 @@
     return null;
   };
   const actions = [];
-  for (const e of document.querySelectorAll(selector)) {
+  for (const e of roots.flatMap(root => [...root.querySelectorAll(selector)])) {
     const file = e.type === 'file';
     if (!safe(e) || !visible(file ? e.parentElement : e) || e.matches(':disabled') ||
         e.closest('[aria-disabled="true"]')) continue;
-    const r = file ? e.parentElement.getBoundingClientRect() : e.getBoundingClientRect(), rname = role(e);
+    const r = topRect(file ? e.parentElement : e), rname = role(e);
     if (!rname || r.width <= 0 || r.height <= 0) continue;
     // Form controls are listed wherever they are; acting scrolls them into view.
     // Other links/buttons only when on screen or inside a form/dialog, to keep output small.
@@ -121,5 +152,5 @@
   const omitted_actions = Math.max(0, actions.length - 250);
   actions.splice(250);
   return {url: location.href, title: document.title, h: innerHeight, scroll: {y: Math.round(scrollY), height},
-    actions, omitted_actions};
+    actions, omitted_actions, frames};
 })()

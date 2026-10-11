@@ -267,6 +267,61 @@ def complete_step1_and_advance():
     idx(sgaj("look"), "LinkedIn profile")
 
 
+@scenario()
+def fields_inside_same_origin_iframe_are_usable():
+    look = sgaj("open", page("apply.html", "#s2"))
+    assert sgaj("select", idx(look, "Gender", "select"), "Male") == "ok: Male"
+    assert sgaj("click", idx(look, "protected veteran", "checkbox")) == "ok"
+    assert dom("[eeo.contentDocument.getElementById('g').value, eeo.contentDocument.getElementById('vet').checked]") \
+        == ["Male", True]
+
+
+@scenario()
+def fields_inside_shadow_dom_are_usable():
+    look = sgaj("open", page("apply.html", "#s2"))
+    assert sgaj("fill", idx(look, "Pronouns"), "he/him") == "ok"
+    assert dom("document.querySelector('pronoun-field').shadowRoot.getElementById('p').value") == "he/him"
+
+
+@scenario()
+def cross_origin_frame_is_reported_not_hidden():
+    look = sgaj("open", page("frames.html"))
+    assert "frame (cross-origin" in look and "data:text/html" in look, look
+
+
+@scenario()
+def full_application_end_to_end():
+    look = sgaj("open", page("apply.html"))
+    for label, value in {"First name": "Simarpreet", "Last name": "Singh", "Email": "s@example.com",
+                         "Phone": "+91 98765 43210"}.items():
+        sgaj("fill", idx(look, label), value)
+    sgaj("pick", idx(look, "Current location"), "Lucknow")
+    sgaj("upload", idx(look, "Resume/CV", "file"), RESUME)
+    sgaj("click", idx(look, "Next"))
+    look = sgaj("look")
+    sgaj("fill", idx(look, "LinkedIn"), "https://linkedin.com/in/simarpreet")
+    sgaj("fill", idx(look, "GitHub"), "https://github.com/Parallax316")
+    sgaj("select", idx(look, "Years of professional experience"), "1-2")
+    yes_auth = re.search(r'^\[(\d+)\] radio "Yes" in "Are you legally', look, re.M)[1]
+    no_sponsor = re.search(r'^\[(\d+)\] radio "No" in "Will you require visa', look, re.M)[1]
+    sgaj("click", yes_auth)
+    sgaj("click", no_sponsor)
+    sgaj("pick", idx(look, "Notice period"), "30 days")
+    sgaj("fill", idx(look, "Expected CTC"), "18")
+    sgaj("fill", idx(look, "Why do you want"), "I build production agentic AI systems.")
+    sgaj("select", idx(look, "Gender"), "Male")
+    sgaj("fill", idx(look, "Pronouns"), "he/him")
+    sgaj("click", idx(look, "privacy policy", "checkbox"))
+    sgaj("click", idx(look, "Submit application"))
+    assert dom("window.__result") == {
+        "fn": "Simarpreet", "ln": "Singh", "em": "s@example.com", "ph": "+91 98765 43210",
+        "loc": "Lucknow, Uttar Pradesh, India", "cv": "resume.pdf", "li": "https://linkedin.com/in/simarpreet",
+        "gh": "https://github.com/Parallax316", "yoe": "1-2", "auth": "yes", "spon": "no", "np": "30 days",
+        "ctc": "18", "why": "I build production agentic AI systems.", "gender": "Male", "vet": False,
+        "pronouns": "he/him", "consent": True,
+    }
+
+
 # --- runner ---------------------------------------------------------------------------------------
 
 
