@@ -136,20 +136,51 @@ class Tab:
     @classmethod
     def new(cls, url):
         target = cdp("Target.createTarget", url="about:blank")["targetId"]
-        state_file().parent.mkdir(parents=True, exist_ok=True)
-        state_file().write_text(json.dumps({"target": target}))
+        cls.remember(target)
         tab = cls(target)
         tab.goto(url)
         return tab
 
+    @staticmethod
+    def remember(target):
+        state_file().parent.mkdir(parents=True, exist_ok=True)
+        state_file().write_text(json.dumps({"target": target}))
+
+    @staticmethod
+    def pages():
+        """Open page tabs (not extensions or devtools), in browser order."""
+        internal = ("chrome://", "chrome-extension://", "devtools://", "edge://")
+        return [t for t in cdp("Target.getTargets")["targetInfos"]
+                if t["type"] == "page" and not t["url"].startswith(internal)]
+
+    @staticmethod
+    def remembered():
+        try:
+            return json.loads(state_file().read_text())["target"]
+        except (OSError, ValueError, KeyError):
+            return None
+
+    @classmethod
+    def attach(cls, which):
+        """Make an existing tab current, by number from `tabs` or by text in its title/URL."""
+        pages = cls.pages()
+        if which.isdigit() and 1 <= int(which) <= len(pages):
+            target = pages[int(which) - 1]
+        else:
+            target = next((t for t in pages if which.lower() in (t["title"] + " " + t["url"]).lower()), None)
+        if not target:
+            raise ActionError(f"No tab matches {which!r}. Run: sgaj tabs")
+        cls.remember(target["targetId"])
+        return cls(target["targetId"])
+
+    def show(self):
+        cdp("Target.activateTarget", targetId=self.target)
+
     @classmethod
     def current(cls):
-        try:
-            target = json.loads(state_file().read_text())["target"]
-        except (OSError, ValueError, KeyError):
-            target = None
+        target = cls.remembered()
         if not any(t["targetId"] == target for t in cdp("Target.getTargets")["targetInfos"]):
-            raise SystemExit("No open tab. Run: sgaj open URL")
+            raise SystemExit("No open tab. Run: sgaj open URL, or sgaj tabs + sgaj attach N")
         return cls(target)
 
     def call(self, method, **params):
