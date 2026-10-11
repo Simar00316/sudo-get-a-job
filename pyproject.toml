@@ -7,6 +7,9 @@ license = "MIT"
 requires-python = ">=3.12"
 dependencies = ["browser-harness==0.1.13"]
 
+[project.scripts]
+sgaj = "sudo_get_a_job.cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
