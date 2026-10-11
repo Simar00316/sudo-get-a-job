@@ -127,6 +127,9 @@
       actions.push({...base, kind: 'upload', value: [...e.files].map(f => f.name).join(', ') || '(none)'});
       continue;
     }
+    // Button-style dropdowns behave like comboboxes: they hold an answer.
+    if (rname === 'button' && ['listbox', 'true', 'menu', 'dialog'].includes(e.getAttribute('aria-haspopup')))
+      base.role = 'combobox';
     for (const key of ['checked', 'selected', 'expanded']) {
       const value = e.getAttribute('aria-' + key);
       if (value !== null) base[key] = value;
@@ -145,6 +148,11 @@
       base.empty = e.type === 'radio' ? !group.some(x => x.checked) : e.type === 'checkbox' ? !e.checked :
         e.tagName === 'SELECT' ? e.value === '' :
         !('value' in e && e.tagName !== 'BUTTON' ? e.value : e.innerText).trim();
+      // A custom dropdown still showing its placeholder has no answer yet.
+      const shown = base.role === 'combobox' && e.tagName !== 'SELECT' && !('value' in e && e.tagName !== 'BUTTON') &&
+        e.innerText.trim();
+      if (shown && (/^(select|choose|please select|pick)\b|^-+$/i.test(shown) ||
+          [e.getAttribute('placeholder'), e.dataset.placeholder].includes(shown))) base.empty = true;
       if (e.getAttribute('aria-invalid') === 'true') base.invalid = true;
     }
     if (e.tagName === 'SELECT') {
@@ -156,8 +164,6 @@
         (['textbox', 'searchbox', 'spinbutton'].includes(rname) ||
           (rname === 'combobox' && ['INPUT', 'TEXTAREA'].includes(e.tagName)));
       // Button-style dropdowns show their choice as text; React-Select keeps it beside an empty input.
-      const popup = ['listbox', 'true', 'menu', 'dialog'].includes(e.getAttribute('aria-haspopup'));
-      if (popup && rname === 'button') base.role = 'combobox';
       let value = 'value' in e && e.tagName !== 'BUTTON' ? String(e.value) :
         e.isContentEditable || base.role === 'combobox' ? e.innerText.trim() : '';
       if (rname === 'combobox' && e.tagName === 'INPUT' && !value)
