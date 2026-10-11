@@ -337,6 +337,13 @@ def multi_line_links_keep_all_their_lines():
     assert 'link "Senior AI Engineer Acme AI Remote, India"' in look, look
 
 
+@scenario()
+def select_updates_react_controlled_state():
+    look = sgaj("open", page("react.html"))
+    assert sgaj("select", idx(look, "Years of experience"), "1-2") == "ok: 1-2"
+    assert dom("window.reactState") == "1-2"
+
+
 # --- runner ---------------------------------------------------------------------------------------
 
 
