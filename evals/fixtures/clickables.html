@@ -1,0 +1,15 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Job at a startup</title></head><body>
+<h1>Forward Deployed Engineer</h1>
+<!-- Work at a Startup: an anchor without href, wired up in JS -->
+<a id="apply" class="hover:cursor-pointer inline-flex border rounded">Apply</a>
+<div onclick="window.saved = true">Save job</div>
+<div tabindex="0" id="share">Share</div>
+<span>Plain text, not clickable</span>
+<!-- Focusable wrapper around real controls: not a button itself -->
+<div tabindex="0" id="panel">Filters panel <button>Remote only</button></div>
+<script>
+document.getElementById('apply').onclick = () => { window.applied = true; };
+document.getElementById('share').addEventListener('click', () => { window.shared = true; });
+</script>
+</body></html>

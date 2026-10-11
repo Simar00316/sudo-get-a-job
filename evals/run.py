@@ -459,6 +459,18 @@ def links_collects_job_urls_from_results():
     assert "company/acme" in sgaj("links")
 
 
+@scenario()
+def js_only_clickables_are_listed_and_clickable():
+    look = sgaj("open", page("clickables.html"))
+    for label in ["Apply", "Save job", "Share"]:
+        assert re.search(rf'^\[\d+\] button "{label}"$', look, re.M), look
+    assert "Plain text" not in look and "Filters panel" not in look, look
+    idx(look, "Remote only", "button")
+    for label in ["Apply", "Save job", "Share"]:
+        assert sgaj("click", idx(look, label, "button")) == "ok"
+    assert dom("[window.applied, window.saved, window.shared]") == [True, True, True]
+
+
 # --- runner ---------------------------------------------------------------------------------------
 
 
