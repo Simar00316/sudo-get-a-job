@@ -31,7 +31,7 @@ def render(snap):
             line += f" = \"{clip(a.get('current_value', ''), 40)}\" options: {clip(' | '.join(options), 200)}"
         elif a.get("checked") is not None:
             line += " (on)" if a["checked"] == "true" else " (off)"
-        elif "fill" in kinds or a["role"] == "combobox":
+        elif kinds & {"fill", "upload"} or a["role"] == "combobox":
             line += f" = \"{clip(a.get('value', ''), 60)}\""
         if a.get("expanded") == "true":
             line += " (expanded)"
@@ -57,6 +57,9 @@ def main(argv=None):
     s = sub.add_parser("select", help="choose OPTION in native dropdown N")
     s.add_argument("n")
     s.add_argument("option")
+    u = sub.add_parser("upload", help="attach a file to file field N (or its upload button)")
+    u.add_argument("n")
+    u.add_argument("path")
     sub.add_parser("press", help="press a key: Enter, Tab, Escape, ArrowDown, ...").add_argument("key")
     sub.add_parser("scroll", help="scroll the page").add_argument("direction", choices=["up", "down"])
     sub.add_parser("back", help="browser back")
@@ -81,6 +84,8 @@ def main(argv=None):
             print("ok")
         elif args.cmd == "select":
             print(f"ok: {tab.select(args.n, args.option)}")
+        elif args.cmd == "upload":
+            print(f"ok: {tab.upload(args.n, args.path)}")
         elif args.cmd == "press":
             tab.press(args.key)
             print("ok")

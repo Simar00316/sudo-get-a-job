@@ -1,0 +1,11 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Upload widget</title>
+<style>.sr{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}</style></head><body>
+<div class="field">
+  <div id="cv-l">Resume *</div>
+  <input class="sr" type="file" id="cv" aria-labelledby="cv-l">
+  <button type="button" id="pick" onclick="cv.click()">Upload file</button>
+  <span id="shown"></span>
+</div>
+<script>cv.onchange = () => shown.textContent = cv.files[0]?.name || '';</script>
+</body></html>

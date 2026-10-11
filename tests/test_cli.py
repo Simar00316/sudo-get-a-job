@@ -35,3 +35,8 @@ def test_render_reports_more_content_and_omissions():
 def test_clip_collapses_whitespace_and_truncates():
     assert clip("a \n  b") == "a b"
     assert clip("x" * 100, 10) == "x" * 9 + "…"
+
+
+def test_render_shows_attached_file_name():
+    out = render(snap([{"node": 9, "role": "file", "kind": "upload", "label": "Resume *", "value": "cv.pdf"}]))
+    assert out.splitlines()[-1] == '[9] file "Resume *" = "cv.pdf"'

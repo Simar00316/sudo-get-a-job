@@ -7,7 +7,7 @@
     const id = cache.ids.get(e); cache.nodes.set(id, e); return id;
   };
   for (const [id, e] of cache.nodes) if (!e.isConnected) cache.nodes.delete(id);
-  const safe = e => !['password', 'file', 'hidden'].includes(e.type);
+  const safe = e => !['password', 'hidden'].includes(e.type);
   const visible = e => !e.closest('[aria-hidden="true"],[inert]') &&
     e.checkVisibility({checkOpacity: true, checkVisibilityCSS: true});
   const name = (e, seen = new Set()) => {
@@ -22,9 +22,17 @@
         n.nodeType === 1 && n.getAttribute('aria-hidden') !== 'true' ? name(n, seen) : '').join(' ').trim()) ||
       e.getAttribute('title') || e.getAttribute('placeholder') || '';
   };
+  // File inputs are usually visually hidden behind a styled button; name them from their field.
+  const fieldText = e => {
+    for (let p = e.parentElement, i = 0; p && i < 4; p = p.parentElement, i++) {
+      const t = p.innerText?.trim().split(/\n/)[0];
+      if (t) return t;
+    }
+    return '';
+  };
   const roles = ['button', 'link', 'checkbox', 'radio', 'switch', 'tab', 'menuitem', 'menuitemradio',
     'option', 'gridcell', 'combobox', 'textbox', 'searchbox', 'spinbutton'];
-  const formRoles = ['checkbox', 'radio', 'switch', 'combobox', 'textbox', 'searchbox', 'spinbutton'];
+  const formRoles = ['file', 'checkbox', 'radio', 'switch', 'combobox', 'textbox', 'searchbox', 'spinbutton'];
   const selector = 'a[href],button,input,textarea,select,summary,[contenteditable="true"],' +
     roles.map(role => '[role="' + role + '"]').join(',');
   const role = e => {
@@ -35,6 +43,7 @@
     if (e.tagName === 'SELECT') return 'combobox';
     if (e.tagName === 'TEXTAREA' || e.isContentEditable) return 'textbox';
     if (e.tagName === 'INPUT') {
+      if (e.type === 'file') return 'file';
       if (['checkbox', 'radio'].includes(e.type)) return e.type;
       if (['button', 'submit', 'reset', 'image'].includes(e.type)) return 'button';
       if (e.type === 'search') return 'searchbox';
@@ -45,15 +54,21 @@
   };
   const actions = [];
   for (const e of document.querySelectorAll(selector)) {
-    if (!safe(e) || !visible(e) || e.matches(':disabled') || e.closest('[aria-disabled="true"]')) continue;
-    const r = e.getBoundingClientRect(), rname = role(e);
+    const file = e.type === 'file';
+    if (!safe(e) || !visible(file ? e.parentElement : e) || e.matches(':disabled') ||
+        e.closest('[aria-disabled="true"]')) continue;
+    const r = file ? e.parentElement.getBoundingClientRect() : e.getBoundingClientRect(), rname = role(e);
     if (!rname || r.width <= 0 || r.height <= 0) continue;
     // Form controls are listed wherever they are; acting scrolls them into view.
     // Other links/buttons only when on screen or inside a form/dialog, to keep output small.
     const onScreen = r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
     if (!onScreen && !formRoles.includes(rname) && !e.closest('form,dialog,[role="dialog"],[role="form"]')) continue;
     if (rname === 'gridcell' && e.querySelector('button,[role="button"]')) continue;
-    const base = {node: identity(e), role: rname, label: name(e) || rname};
+    const base = {node: identity(e), role: rname, label: name(e) || (file && fieldText(e)) || rname};
+    if (file) {
+      actions.push({...base, kind: 'upload', value: [...e.files].map(f => f.name).join(', ') || '(none)'});
+      continue;
+    }
     for (const key of ['checked', 'selected', 'expanded']) {
       const value = e.getAttribute('aria-' + key);
       if (value !== null) base[key] = value;
