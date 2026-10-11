@@ -1,17 +1,14 @@
-"""Observed actions through Browser Harness; one CDP session, no per-step subprocess."""
+"""One persistent tab, observed through snapshot.js and driven by observed element ids."""
 
-import hashlib
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
 from .connect import connect
 
-# Atomically read visible content and controls, preserving actual DOM node identity.
-READ_STATE = Path(__file__).with_name("snapshot.js").read_text()
-MARKER = f"(() => {{ const state={READ_STATE}; return state?.marker ?? null; }})()"
-
+SNAPSHOT = Path(__file__).with_name("snapshot.js").read_text(encoding="utf-8")
 _cdp = None
 
 
@@ -21,181 +18,169 @@ def cdp(method, **params):
     return _cdp(method, **params)
 
 
-class StalePage(ValueError):
-    """A decision no longer refers to the observed page."""
+def state_file():
+    return Path(os.environ.get("SGAJ_HOME") or Path.home() / ".sudo-get-a-job") / "tab.json"
 
 
-class Browser:
-    def __init__(self, url):
-        self.target = cdp("Target.createTarget", url="about:blank", background=True)["targetId"]
-        self.session = cdp("Target.attachToTarget", targetId=self.target, flatten=True)["sessionId"]
-        self.call("Emulation.setDeviceMetricsOverride", width=1120, height=780, deviceScaleFactor=1, mobile=False)
-        # Keep rAF/menus rendering in an owned background tab, without activating the user's Chrome tab.
+class ActionError(RuntimeError):
+    """The requested action could not run. Nothing was changed."""
+
+
+# Resolve an observed node, refuse anything the user couldn't interact with, return its click point.
+RESOLVE = """(node => {
+  const e = window.__jevFast?.nodes.get(node);
+  if (!e?.isConnected) return {error: `Element [${node}] is gone. Run look again.`};
+  if (e.matches(':disabled') || e.closest('[aria-disabled="true"],[inert]'))
+    return {error: `Element [${node}] is disabled.`};
+  if (!e.checkVisibility({checkOpacity: true, checkVisibilityCSS: true}))
+    return {error: `Element [${node}] is hidden.`};
+  const r = e.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2;
+  if (!r.width || !r.height || x < 0 || y < 0 || x >= innerWidth || y >= innerHeight)
+    return {error: `Element [${node}] is off screen. Scroll first.`};
+  const hit = document.elementFromPoint(x, y);
+  if (!e.contains(hit) && !hit?.contains(e)) return {error: `Element [${node}] is covered by another element.`};
+  return {x, y, tag: e.tagName, readOnly: !!e.readOnly};
+})"""
+
+SELECT = """((node, want) => {
+  const e = window.__jevFast.nodes.get(node), norm = s => s.trim().toLowerCase();
+  if (e.tagName !== 'SELECT') return {error: `Element [${node}] is not a dropdown. Click it instead.`};
+  const usable = [...e.options].filter(o => !o.disabled && !o.closest('optgroup[disabled]'));
+  const o = usable.find(o => norm(o.label) === norm(want) || norm(o.value) === norm(want));
+  if (!o) return {error: `No option "${want}". Options: ${usable.map(o => o.label).join(' | ')}`};
+  e.value = o.value;
+  e.dispatchEvent(new Event('input', {bubbles: true}));
+  e.dispatchEvent(new Event('change', {bubbles: true}));
+  return {selected: o.label};
+})"""
+
+KEYS = {"Enter": 13, "Tab": 9, "Escape": 27, "Backspace": 8, "ArrowDown": 40, "ArrowUp": 38, "Space": 32}
+
+
+class Tab:
+    def __init__(self, target):
+        self.target = target
+        self.session = cdp("Target.attachToTarget", targetId=target, flatten=True)["sessionId"]
+        # Keep timers/animations running even when the user is looking at another tab.
         self.call("Emulation.setFocusEmulationEnabled", enabled=True)
-        self.call("Page.navigate", url=url)
-        deadline = time.monotonic() + 15
-        while time.monotonic() < deadline:
-            if self.evaluate("document.readyState") == "complete":
-                break
-            time.sleep(0.02)
+
+    @classmethod
+    def new(cls, url):
+        target = cdp("Target.createTarget", url="about:blank")["targetId"]
+        state_file().parent.mkdir(parents=True, exist_ok=True)
+        state_file().write_text(json.dumps({"target": target}))
+        tab = cls(target)
+        tab.goto(url)
+        return tab
+
+    @classmethod
+    def current(cls):
+        try:
+            target = json.loads(state_file().read_text())["target"]
+        except (OSError, ValueError, KeyError):
+            target = None
+        if not any(t["targetId"] == target for t in cdp("Target.getTargets")["targetInfos"]):
+            raise SystemExit("No open tab. Run: sgaj open URL")
+        return cls(target)
 
     def call(self, method, **params):
         return cdp(method, session_id=self.session, **params)
 
-    def evaluate(self, expression):
-        response = self.call("Runtime.evaluate", expression=expression, returnByValue=True)
-        if response.get("exceptionDetails"):
-            raise StalePage("Document changed during evaluation")
-        return response.get("result", {}).get("value")
+    def evaluate(self, expression, await_promise=False):
+        r = self.call("Runtime.evaluate", expression=expression, returnByValue=True, awaitPromise=await_promise)
+        if r.get("exceptionDetails"):
+            raise ActionError("Page changed while reading it. Run look again.")
+        return r.get("result", {}).get("value")
 
-    def observe(self, screenshot=True):
-        if getattr(self, "after_input", None):
-            action, self.after_input = self.after_input, None
-            # This is read-only and happens after execution was logged, even if navigation interrupts it.
+    def wait_ready(self, timeout=15):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
             try:
-                self.call(
-                    "Runtime.evaluate",
-                    expression="""(action => new Promise(resolve => {
-                      const field=window.__jevFast?.nodes.get(action.node);
-                      const autocomplete=action.kind==='fill' && field?.getAttribute('role')==='combobox';
-                      let frames=0, stopped=false;
-                      const finish=()=>{stopped=true;resolve()};
-                      setTimeout(finish,autocomplete ? 200 : 50);
-                      const ready=()=>{
-                        if (stopped) return;
-                        const ids=(field?.getAttribute('aria-controls')||field?.getAttribute('aria-owns')||'')
-                          .split(/\\s+/).filter(Boolean);
-                        const roots=ids.length ? ids.map(id=>document.getElementById(id)).filter(Boolean) : [document];
-                        const options=roots.flatMap(root=>[...root.querySelectorAll('[role="option"]')]);
-                        if (++frames>=2 && (!autocomplete || options.some(e=>{
-                          const r=e.getBoundingClientRect();
-                          return r.width && r.height && r.bottom>0 && r.top<innerHeight &&
-                            e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true});
-                        }))) finish();
-                        else requestAnimationFrame(ready);
-                      };
-                      requestAnimationFrame(ready);
-                    }))(""" + json.dumps(action) + ")",
-                    awaitPromise=True,
-                    returnByValue=True,
-                )
-            except RuntimeError:
+                if self.evaluate("document.readyState") == "complete":
+                    return
+            except ActionError:
                 pass
-        for attempt in range(10):
-            try:
-                return browser_operation(
-                    {"operation": "observe", "session": self.session, "screenshot": screenshot}
-                )
-            except StalePage:
-                if attempt == 9:
-                    raise
-                time.sleep(0.02)
-        raise StalePage("Page did not settle")
-
-    def fresh(self, page, action=None):
-        if action is not None and action["kind"] in {"click", "select"}:
-            node = action["node"]
-            if type(node) is not int:
-                return False
-            current = self.evaluate(
-                "(() => { const c=window.__jevFast; "
-                f"return c ? [c.pageKey(),c.guard(c.nodes.get({node}))] : null; }})()"
-            )
-            return current == [page["page_key"], page["guards"].get(str(node))]
-        return self.evaluate(MARKER) == page["marker"]
-
-    def act(self, action, page, text=None):
-        if not self.fresh(page, action):
-            raise StalePage("Page changed since this decision. Observe again.")
-        if action["kind"] == "wait":
             time.sleep(0.1)
-        result = browser_operation({"operation": "act", "session": self.session, "action": action, "text": text})
-        self.after_input = action if action["kind"] != "wait" else None
-        return result
+
+    def goto(self, url):
+        self.call("Page.navigate", url=url)
+        time.sleep(0.2)
+        self.wait_ready()
+
+    def snapshot(self):
+        for _ in range(20):
+            self.wait_ready()
+            try:
+                if state := self.evaluate(SNAPSHOT):
+                    return state
+            except ActionError:
+                pass
+            time.sleep(0.15)
+        raise ActionError("Page did not settle. Try again.")
+
+    def read(self, limit=12000):
+        return self.evaluate(
+            "(() => { const m = [...document.querySelectorAll('main,[role=main],article')]"
+            ".find(e => e.innerText.length > 500); return (m || document.body).innerText; })()"
+        )[:limit]
+
+    def _resolve(self, node):
+        if not str(node).isdigit():
+            raise ActionError(f"Element must be a number from look, got {node!r}.")
+        target = self.evaluate(f"{RESOLVE}({int(node)})")
+        if target is None:
+            raise ActionError("Run look first; this page has not been observed.")
+        if "error" in target:
+            raise ActionError(target["error"])
+        return target
+
+    def _mouse_click(self, x, y):
+        for event in ("mousePressed", "mouseReleased"):
+            self.call("Input.dispatchMouseEvent", type=event, x=x, y=y, button="left", clickCount=1)
+
+    def click(self, node):
+        t = self._resolve(node)
+        self._mouse_click(t["x"], t["y"])
+
+    def fill(self, node, text):
+        t = self._resolve(node)
+        if t["readOnly"]:
+            raise ActionError(f"Element [{node}] is read-only. Click it instead.")
+        self._mouse_click(t["x"], t["y"])
+        mod = 4 if sys.platform == "darwin" else 2
+        self.call("Input.dispatchKeyEvent", type="keyDown", key="a", code="KeyA", modifiers=mod, commands=["selectAll"])
+        self.call("Input.dispatchKeyEvent", type="keyUp", key="a", code="KeyA", modifiers=mod)
+        self.call("Input.insertText", text=text)
+
+    def select(self, node, option):
+        self._resolve(node)
+        r = self.evaluate(f"{SELECT}({int(node)}, {json.dumps(option)})")
+        if "error" in r:
+            raise ActionError(r["error"])
+        return r["selected"]
+
+    def press(self, key):
+        if key not in KEYS:
+            raise ActionError(f"Unsupported key {key!r}. Use one of: {', '.join(KEYS)}")
+        params = dict(key=key, code=key, windowsVirtualKeyCode=KEYS[key])
+        text = {"Enter": "\r", "Space": " "}.get(key)
+        self.call("Input.dispatchKeyEvent", type="keyDown", **params, **({"text": text} if text else {}))
+        self.call("Input.dispatchKeyEvent", type="keyUp", **params)
+
+    def scroll(self, direction):
+        self.evaluate(f"scrollBy(0, {1 if direction == 'down' else -1} * innerHeight * 0.8)")
+
+    def back(self):
+        self.evaluate("history.back()")
+        time.sleep(0.3)
+        self.wait_ready()
 
     def close(self):
-        if self.target:
-            cdp("Target.closeTarget", targetId=self.target)
-            self.target = None
+        cdp("Target.closeTarget", targetId=self.target)
+        state_file().unlink(missing_ok=True)
 
-
-def fingerprint(state):
-    content = {k: state[k] for k in ("url", "text", "actions", "scroll")}
-    return hashlib.sha256(json.dumps(content, sort_keys=True).encode()).hexdigest()
-
-
-def browser_operation(request):
-    operation = request["operation"]
-    session = request["session"]
-
-    def call(method, **params):
-        return cdp(method, session_id=session, **params)
-
-    def evaluate(expression):
-        result = call("Runtime.evaluate", expression=expression, returnByValue=True)
-        if result.get("exceptionDetails"):
-            if operation == "act" and request["action"]["kind"] == "select":
-                raise RuntimeError("Dropdown execution was interrupted; inspect before retrying.")
-            raise StalePage("Document changed during evaluation")
-        return result.get("result", {}).get("value")
-
-    if operation == "act":
-        action = request["action"]
-        kind = action["kind"]
-        if kind == "scroll":
-            call("Input.dispatchMouseEvent", type="mouseWheel", x=550, y=650, deltaX=0, deltaY=action["delta"])
-        elif kind != "wait":
-            if type(action["node"]) is not int:
-                raise ValueError("Invalid observed node")
-            # Code-owned node IDs refer to actual observed elements, never model-generated selectors.
-            target = evaluate("""(action => {
-              const e=window.__jevFast?.nodes.get(action.node);
-              if (!e?.isConnected || e.matches(':disabled') || e.closest('[aria-disabled="true"],[inert]') ||
-                  !e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true})) return null;
-              if (action.kind==='fill' && (e.readOnly || e.getAttribute('aria-readonly')==='true')) return null;
-              const r=e.getBoundingClientRect(), x=r.x+r.width/2, y=r.y+r.height/2;
-              if (!r.width || !r.height || x<0 || y<0 || x>=innerWidth || y>=innerHeight) return null;
-              if (!e.contains(document.elementFromPoint(x,y))) return null;
-              if (action.kind==='select') {
-                if (e.tagName!=='SELECT' || ![...e.options].some(o=>o.value===action.value &&
-                    !o.disabled && !o.closest('optgroup[disabled]'))) return null;
-                e.value=action.value;
-                e.dispatchEvent(new Event('input',{bubbles:true}));
-                e.dispatchEvent(new Event('change',{bubbles:true}));
-              }
-              return {x,y};
-            })(""" + json.dumps(action) + ")")
-            if target is None:
-                if kind == "select":
-                    raise RuntimeError("Dropdown execution was not confirmed; inspect before retrying.")
-                raise StalePage("Target changed or is covered. Observe again.")
-            if kind != "select":
-                x, y = target["x"], target["y"]
-                for event in ("mousePressed", "mouseReleased"):
-                    call("Input.dispatchMouseEvent", type=event, x=x, y=y, button="left", clickCount=1)
-                if kind == "fill":
-                    call(
-                        "Input.dispatchKeyEvent",
-                        type="keyDown",
-                        key="a",
-                        code="KeyA",
-                        modifiers=4 if sys.platform == "darwin" else 2,
-                        commands=["selectAll"],
-                    )
-                    call(
-                        "Input.dispatchKeyEvent",
-                        type="keyUp",
-                        key="a",
-                        code="KeyA",
-                        modifiers=4 if sys.platform == "darwin" else 2,
-                    )
-                    call("Input.insertText", text=request["text"])
-        return {"executed": action["id"]}
-
-    info = evaluate(READ_STATE)
-    if info is None:
-        raise StalePage("Document is navigating")
-    info["fingerprint"] = fingerprint(info)
-    if request.get("screenshot", True):
-        info["screenshot"] = call("Page.captureScreenshot", format="jpeg", quality=72)["data"]
-    return info
+    def detach(self):
+        try:
+            cdp("Target.detachFromTarget", sessionId=self.session)
+        except Exception:
+            pass

@@ -8,4 +8,4 @@ The coding agent is the policy. This repo only observes pages and executes the a
 - Never retry a browser mutation. Never type passwords; users sign in themselves.
 - Tests in `tests/` are offline. Browser evals live in `evals/` and use local fixtures only.
 
-Checks: uv run ruff check ., uv run pytest
+Checks: uv run ruff check ., uv run pytest, uv run python evals/run.py (needs Chrome; launches its own headless copy)

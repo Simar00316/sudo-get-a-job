@@ -1,0 +1,101 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Acme AI — Apply: AI Engineer</title>
+<style>
+body{font:15px system-ui;max-width:760px;margin:20px auto;padding:0 16px}
+label{display:block;margin-top:14px;font-weight:600}
+input[type=text],input[type=email],input[type=tel],input[type=url],textarea,select{width:100%;padding:7px;box-sizing:border-box}
+.opts{position:relative}.list{border:1px solid #999;background:#fff;position:absolute;width:100%;z-index:5}
+.list div{padding:6px}.list div:hover{background:#eef}
+.dd-btn{width:100%;text-align:left;padding:7px}
+.err{color:#b00}.step{display:none}.step.on{display:block}
+iframe{width:100%;height:170px;border:1px solid #ccc;margin-top:14px}
+</style></head><body>
+<h1>AI Engineer — Acme AI</h1>
+<p>Remote · India. Fields marked * are required.</p>
+<form id="f" onsubmit="return false">
+<div class="step on" id="s1">
+  <h2>Step 1 of 2 — Your details</h2>
+  <label for="fn">First name *</label><input id="fn" type="text" required>
+  <label for="ln">Last name *</label><input id="ln" type="text" required>
+  <label for="em">Email *</label><input id="em" type="email" required>
+  <label for="ph">Phone *</label><input id="ph" type="tel" required>
+
+  <label id="loc-l">Current location *</label>
+  <div class="opts"><input id="loc" type="text" role="combobox" aria-labelledby="loc-l" aria-controls="loc-list" aria-expanded="false" autocomplete="off">
+  <div id="loc-list" class="list" role="listbox" hidden></div></div>
+
+  <label for="cv">Resume/CV * (PDF)</label><input id="cv" type="file" accept=".pdf" required>
+  <div id="cv-name"></div>
+  <div class="err" id="e1"></div>
+  <button type="button" id="next">Next</button>
+</div>
+
+<div class="step" id="s2">
+  <h2>Step 2 of 2 — Questions</h2>
+  <label for="li">LinkedIn profile</label><input id="li" type="url">
+  <label for="gh">GitHub URL</label><input id="gh" type="url">
+  <label for="yoe">Years of professional experience *</label>
+  <select id="yoe" required><option value="">Select…</option><option>0-1</option><option>1-2</option><option>2-4</option><option>5+</option></select>
+
+  <fieldset style="margin-top:14px"><legend>Are you legally authorized to work in India? *</legend>
+    <label><input type="radio" name="auth" value="yes"> Yes</label>
+    <label><input type="radio" name="auth" value="no"> No</label></fieldset>
+  <fieldset><legend>Will you require visa sponsorship? *</legend>
+    <label><input type="radio" name="spon" value="yes"> Yes</label>
+    <label><input type="radio" name="spon" value="no"> No</label></fieldset>
+
+  <label id="np-l">Notice period *</label>
+  <div class="opts"><button type="button" class="dd-btn" id="np" aria-haspopup="listbox" aria-labelledby="np-l np" aria-expanded="false">Select...</button>
+  <div class="list" role="listbox" id="np-list" hidden>
+    <div role="option" tabindex="-1">Immediate</div><div role="option" tabindex="-1">15 days</div>
+    <div role="option" tabindex="-1">30 days</div><div role="option" tabindex="-1">60+ days</div></div></div>
+
+  <label for="ctc">Expected CTC (INR LPA) *</label><input id="ctc" type="text" required>
+
+  <label for="why">Why do you want to work at Acme AI? *</label>
+  <textarea id="why" rows="5" required></textarea>
+
+  <p style="margin-top:14px;font-weight:600">Voluntary self-identification (embedded):</p>
+  <iframe id="eeo" srcdoc="<label>Gender <select id=g><option value=''>Select…</option><option>Male</option><option>Female</option><option>Decline to self-identify</option></select></label><br><br><label><input type=checkbox id=vet> I am a protected veteran</label>"></iframe>
+
+  <p style="font-weight:600">Pronouns (web component):</p>
+  <pronoun-field></pronoun-field>
+
+  <div style="height:500px"></div>
+  <label><input type="checkbox" id="consent"> I agree to the privacy policy *</label>
+  <div class="err" id="e2"></div>
+  <button type="button" id="submit">Submit application</button>
+</div>
+</form>
+<pre id="result"></pre>
+<script>
+customElements.define('pronoun-field', class extends HTMLElement{connectedCallback(){
+  const r=this.attachShadow({mode:'open'});r.innerHTML='<label>Pronouns <input id=p type=text></label>';}});
+const cities=['Lucknow, Uttar Pradesh, India','Lucknow Cantonment, India','London, UK','Ludhiana, Punjab, India'];
+const loc=document.getElementById('loc'),ll=document.getElementById('loc-list');
+let locChosen='';
+loc.addEventListener('input',()=>{locChosen='';const q=loc.value.toLowerCase();
+  setTimeout(()=>{ll.innerHTML='';const m=q?cities.filter(c=>c.toLowerCase().startsWith(q.slice(0,3))):[];
+  m.forEach(c=>{const d=document.createElement('div');d.setAttribute('role','option');d.textContent=c;
+    d.onclick=()=>{loc.value=c;locChosen=c;ll.hidden=true;loc.setAttribute('aria-expanded','false')};ll.appendChild(d)});
+  ll.hidden=!m.length;loc.setAttribute('aria-expanded',String(!!m.length))},120)});
+const np=document.getElementById('np'),nl=document.getElementById('np-list');
+np.onclick=()=>{nl.hidden=!nl.hidden;np.setAttribute('aria-expanded',String(!nl.hidden))};
+nl.querySelectorAll('[role=option]').forEach(o=>o.onclick=()=>{np.textContent=o.textContent;np.dataset.v=o.textContent;nl.hidden=true;np.setAttribute('aria-expanded','false')});
+const cv=document.getElementById('cv');cv.onchange=()=>document.getElementById('cv-name').textContent=cv.files[0]?.name||'';
+const v=id=>document.getElementById(id).value.trim();
+document.getElementById('next').onclick=()=>{
+  const miss=[];['fn','ln','em','ph'].forEach(i=>{if(!v(i))miss.push(i)});
+  if(!locChosen)miss.push('location (pick from list)');if(!cv.files.length)miss.push('resume');
+  document.getElementById('e1').textContent=miss.length?'Please complete: '+miss.join(', '):'';
+  if(!miss.length){s1.classList.remove('on');s2.classList.add('on');scrollTo(0,0)}};
+document.getElementById('submit').onclick=()=>{
+  const fr=document.getElementById('eeo').contentDocument;
+  const data={fn:v('fn'),ln:v('ln'),em:v('em'),ph:v('ph'),loc:locChosen,cv:cv.files[0]?.name||null,li:v('li'),gh:v('gh'),
+    yoe:v('yoe'),auth:document.querySelector('[name=auth]:checked')?.value,spon:document.querySelector('[name=spon]:checked')?.value,
+    np:np.dataset.v||null,ctc:v('ctc'),why:v('why'),gender:fr.getElementById('g').value,vet:fr.getElementById('vet').checked,
+    pronouns:document.querySelector('pronoun-field').shadowRoot.getElementById('p').value,consent:consent.checked};
+  window.__result=data;document.getElementById('f').hidden=true;
+  document.getElementById('result').textContent='Application received!\n'+JSON.stringify(data,null,1)};
+if(location.hash==="#s2"){s1.classList.remove("on");s2.classList.add("on")}
+</script></body></html>
