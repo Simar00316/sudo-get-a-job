@@ -34,9 +34,14 @@ RESOLVE = """(node => {
     return {error: `Element [${node}] is disabled.`};
   if (!e.checkVisibility({checkOpacity: true, checkVisibilityCSS: true}))
     return {error: `Element [${node}] is hidden.`};
-  const r = e.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2;
+  let r = e.getBoundingClientRect();
+  if (r.top < 0 || r.left < 0 || r.bottom > innerHeight || r.right > innerWidth) {
+    e.scrollIntoView({block: 'center', inline: 'center', behavior: 'instant'});
+    r = e.getBoundingClientRect();
+  }
+  const x = r.x + r.width / 2, y = r.y + r.height / 2;
   if (!r.width || !r.height || x < 0 || y < 0 || x >= innerWidth || y >= innerHeight)
-    return {error: `Element [${node}] is off screen. Scroll first.`};
+    return {error: `Element [${node}] could not be scrolled into view.`};
   const hit = document.elementFromPoint(x, y);
   if (!e.contains(hit) && !hit?.contains(e)) return {error: `Element [${node}] is covered by another element.`};
   return {x, y, tag: e.tagName, readOnly: !!e.readOnly};
